@@ -19,7 +19,7 @@ get_ll <- function(x, mu, sig_sq){
    - ( n / 2 ) * log(sig_sq)  - (n/2) * log(2 * pi) - (1 / 2 * sig_sq) * sum((x - mu)^2)
 }
 
-calc_bayes_factors <- function(dta, before_period, after_period){
+calc_bayes_factors <- function(dta, before_period, after_period, outcome_var ){
   before_dta <- dta %>% 
     filter(between(year, before_period[1], before_period[2]))
   
@@ -33,11 +33,11 @@ calc_bayes_factors <- function(dta, before_period, after_period){
   
   prev_params <- before_dta %>% 
     summarise(
-      mu  = mean(ch_e0),
-      sig = sd(ch_e0) 
+      mu  = mean({{ outcome_var }}),
+      sig = sd({{ outcome_var }}) 
     )
   
-  ll_noslowdown <- get_ll(x = after_dta %>% pull(ch_e0), 
+  ll_noslowdown <- get_ll(x = after_dta %>% pull({{ outcome_var }}), 
                           mu = pull(prev_params, "mu"), 
                           sig_sq = pull(prev_params, "sig") ^ 2
                   )
@@ -50,7 +50,7 @@ calc_bayes_factors <- function(dta, before_period, after_period){
       mu = pull(prev_params, "mu") * perc
     ) %>% 
     mutate(
-      ll = map_dbl(mu, ~get_ll(mu = ., x = after_dta %>% pull(ch_e0), 
+      ll = map_dbl(mu, ~get_ll(mu = ., x = after_dta %>% pull({{ outcome_var }}), 
                                sig_sq = pull(prev_params, "sig") ^ 2))
     ) %>% 
     mutate(bayes_factor = exp(ll) /  exp(ll_noslowdown))
@@ -135,16 +135,14 @@ ggplot(
 # Adding last available year? 
 
 
-# total since 1950? 
-# by gender? 
 
 tibble(
-  period = c("2013", "2013-14", "2013-15", "2013-16", "2013-17"),
-  after_end = 2013:2017
+  period = c("2013", "2013-14", "2013-15", "2013-16"),
+  after_end = 2013:2016
 ) %>% 
   mutate(
     bayes_df = map(
-      after_end, ~calc_bayes_factors(after_period = c(2013, .), before_period = c(1990, 2012), dta = dta_total)
+      after_end, ~calc_bayes_factors(after_period = c(2013, .), before_period = c(1990, 2012), outcome_var = ch_e0, dta = dta_total)
     )
   ) %>% 
   select(-after_end) %>% 
@@ -162,7 +160,7 @@ dta_tidy %>%
   crossing(after_end = 2013:2016) %>% 
   mutate(
     bayes_df = map2(
-      after_end, data, ~calc_bayes_factors(after_period = c(2013, .x), before_period = c(1990, 2012), dta = .y)
+      after_end, data, ~calc_bayes_factors(after_period = c(2013, .x), before_period = c(1990, 2012), outcome_var = ch_e0, dta = .y)
     )
   ) %>%
   select(sex, after_end, bayes_df) %>% 
@@ -190,7 +188,8 @@ dta_usa %>%
   crossing(after_end = 1999:2017) %>% 
   mutate(
     bayes_df = map2(
-      after_end, data, ~calc_bayes_factors(after_period = c(1999, .x), before_period = c(1960, 1998), dta = .y)
+      after_end, data, ~calc_bayes_factors(after_period = c(1999, .x), before_period = c(1960, 1998), 
+                                           outcome_var = ch_e0, dta = .y)
     )
   ) %>%
   select(sex, after_end, bayes_df) %>% 
@@ -216,7 +215,8 @@ dta_enw %>%
   crossing(after_end = 2012:2017) %>% 
   mutate(
     bayes_df = map2(
-      after_end, data, ~calc_bayes_factors(after_period = c(2012, .x), before_period = c(1990, 2011), dta = .y)
+      after_end, data, ~calc_bayes_factors(after_period = c(2012, .x), before_period = c(1990, 2011), 
+                                           outcome_var = ch_e0, dta = .y)
     )
   ) %>%
   select(sex, after_end, bayes_df) %>% 
@@ -252,4 +252,174 @@ dta_sco %>%
   scale_y_continuous(limits = c(1, 1.005))
 
 
+# Now to look at same by age in single years 
+
+
+dta_mx <- HMDHFDplus::readHMDweb(
+  "GBR_NP", item = "Mx_1x1", 
+  username = userInput(), password = userInput() 
+  ) %>% 
+  as_tibble() %>% 
+  filter(!OpenInterval) %>% 
+  magrittr::set_names(tolower(names(.))) %>% 
+  select(-openinterval) %>% 
+  gather(key = "sex", value = "mx", -year, - age) 
+
+
+dta_mx %>% 
+  group_by(age, sex) %>% 
+  arrange(year) %>%
+  mutate(ln_mx = log(mx)) %>% 
+  mutate(ch_lnmx = ln_mx - lag(ln_mx))   %>% 
+  filter(between(year, 1990, 2012)) %>% 
+  ggplot(aes(x = year, y = ch_lnmx, group = age, colour = age)) + 
+  geom_line() + 
+  facet_wrap(~sex) + 
+  scale_colour_distiller(palette = "Paired") 
+  
+# Maybe change max age to 90
+
+dta_mx %>% 
+  filter(age <= 90) %>% 
+  group_by(age, sex) %>% 
+  arrange(year) %>%
+  mutate(ln_mx = log(mx)) %>% 
+  mutate(ch_lnmx = ln_mx - lag(ln_mx))   %>% 
+  filter(between(year, 1990, 2012)) %>% 
+  ggplot(aes(x = year, y = ch_lnmx, group = age, colour = age)) + 
+  geom_line() + 
+  facet_wrap(~sex) + 
+  scale_colour_distiller(palette = "Paired")  + 
+  geom_hline(yintercept = 0)
+
+# So, with the exception of very old males, the highest variances are in childhood (few events)
+# and the general tendency is negative 
+
+# And if absolute rather than relative (logged) used? 
+
+dta_mx %>% 
+  filter(age <= 90) %>% 
+  group_by(age, sex) %>% 
+  arrange(year) %>%
+  mutate(ch_mx = mx - lag(mx))   %>% 
+  filter(between(year, 1990, 2012)) %>% 
+  ggplot(aes(x = year, y = ch_mx, group = age, colour = age)) + 
+  geom_line() + 
+  facet_wrap(~sex) + 
+  scale_colour_distiller(palette = "Paired")  + 
+  geom_hline(yintercept = 0)
+
+# This doesn't work as well. 
+
+# So use logged 
+# How about recent years? 
+
+dta_mx %>% 
+  filter(age <= 90) %>% 
+  group_by(age, sex) %>% 
+  arrange(year) %>%
+  mutate(ln_mx = log(mx)) %>% 
+  mutate(ch_lnmx = ln_mx - lag(ln_mx))   %>% 
+  filter(between(year, 1990, 2017)) %>% 
+  ggplot(aes(x = year, y = ch_lnmx, group = age, colour = age)) + 
+  geom_line() + 
+  facet_wrap(~sex) + 
+  scale_colour_distiller(palette = "Paired")  + 
+  geom_hline(yintercept = 0) + 
+  geom_vline(xintercept = 2012) +
+  stat_smooth(se = F, linetype = "dashed", colour = "black", size = 1.2, mapping = aes(x = year, y = ch_lnmx), inherit.aes = FALSE)
+
+# So something like a general uptick looks apparent here. 
+
+# Now since 1960? 
+
+
+dta_mx %>% 
+  filter(age <= 90) %>% 
+  group_by(age, sex) %>% 
+  arrange(year) %>%
+  mutate(ln_mx = log(mx)) %>% 
+  mutate(ch_lnmx = ln_mx - lag(ln_mx))   %>% 
+  filter(between(year, 1960, 2017)) %>% 
+  ggplot(aes(x = year, y = ch_lnmx, group = age, colour = age)) + 
+  geom_line() + 
+  facet_wrap(~sex) + 
+  scale_colour_distiller(palette = "Paired")  + 
+  geom_hline(yintercept = 0) + 
+  geom_vline(xintercept = 2012) +
+  stat_smooth(se = F, linetype = "dashed", colour = "black", size = 1.2, mapping = aes(x = year, y = ch_lnmx), inherit.aes = FALSE)
+
+# So over this longer term perspective it looks like the average % rates of improvement 
+# have been slowly increasingly somewhat, mainly driven by male improvment rates. However, 
+# the slowdown in recent years for both genders is apparent. 
+
+
+# n.b. it would be interesting to see this as a 3D surface, but let's keep on track! 
+
+
+# Bayes Factors by age groups 
+
+bf_mx_uk <- dta_mx %>% 
+  filter(age <= 90) %>% 
+  group_by(age, sex) %>% 
+  arrange(year) %>%
+  mutate(ln_mx = log(mx)) %>% 
+  mutate(ch_lnmx = ln_mx - lag(ln_mx))  %>% 
+  nest() %>% 
+  mutate(after_end = 2016) %>% 
+  mutate(
+    bayes_df = map2(
+      after_end, data, ~calc_bayes_factors(after_period = c(2012, .x), before_period = c(1990, 2011), 
+                                           outcome_var = ch_lnmx, 
+                                           dta = .y)
+    )
+  ) %>%
+  select(age, sex, after_end, bayes_df)
+
+bf_mx_uk %>% 
+  filter(after_end == 2016) %>% 
+  unnest() %>% 
+  ggplot(aes(x = age, y = perc, fill = bayes_factor)) + 
+  geom_tile() + 
+  facet_wrap(~sex)
+
+
+bf_mx_uk %>% 
+  unnest() %>% 
+  group_by(sex, age) %>% 
+  mutate(scaled_factor = (bayes_factor - min(bayes_factor))/ (max(bayes_factor) - min(bayes_factor))) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = age, y = perc, fill = scaled_factor)) + 
+  geom_tile() + 
+  facet_wrap(~sex)
+
+
+  
+
+bf_mx_uk_55 <- dta_mx %>% 
+  filter(age <= 90) %>% 
+  group_by(age, sex) %>% 
+  arrange(year) %>%
+  mutate(ln_mx = log(mx)) %>% 
+  mutate(ch_lnmx = ln_mx - lag(ln_mx))  %>% 
+  nest() %>% 
+  mutate(after_end = 2016) %>% 
+  mutate(
+    bayes_df = map2(
+      after_end, data, ~calc_bayes_factors(after_period = c(2012, .x), before_period = c(1955, 2011), 
+                                           outcome_var = ch_lnmx, 
+                                           dta = .y)
+    )
+  ) %>%
+  select(age, sex, after_end, bayes_df)
+
+
+bf_mx_uk_55 %>% 
+  unnest() %>% 
+  group_by(sex, age) %>% 
+  mutate(scaled_factor = (bayes_factor - min(bayes_factor))/ (max(bayes_factor) - min(bayes_factor))) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = age, y = perc, fill = scaled_factor)) + 
+  geom_tile() + 
+  facet_wrap(~sex)
 
