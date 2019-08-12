@@ -14,12 +14,13 @@ pacman::p_load(
 
 # Functions 
 get_ll <- function(x, mu, sig_sq){
+  sig <- sqrt(sig_sq)
   n <- length(x)
   
-   - ( n / 2 ) * log(sig_sq)  - (n/2) * log(2 * pi) - (1 / 2 * sig_sq) * sum((x - mu)^2)
+   - n * log(sig)  - (n/2) * log(2 * pi) - (1 / 2 * sig_sq) * sum((x - mu)^2)
 }
 
-calc_bayes_factors <- function(dta, before_period, after_period, outcome_var ){
+calc_bayes_factors <- function(dta, before_period, after_period, outcome_var, perc_range = seq(from = 1, to = 0, by = -0.01)){
   before_dta <- dta %>% 
     filter(between(year, before_period[1], before_period[2]))
   
@@ -44,7 +45,7 @@ calc_bayes_factors <- function(dta, before_period, after_period, outcome_var ){
   
   scenarios_df <- 
     tibble(
-      perc = seq(from = 1, to =0, by = -0.01)
+      perc = perc_range
     ) %>% 
     mutate(
       mu = pull(prev_params, "mu") * perc
@@ -60,95 +61,50 @@ calc_bayes_factors <- function(dta, before_period, after_period, outcome_var ){
   return(scenarios_df)
 }
 
-getHMDcountries()
+# getHMDcountries()
 
-dta <- HMDHFDplus::readHMDweb("GBR_NP", item = "E0per", username = userInput(), password = userInput())
+dta_uk <- HMDHFDplus::readHMDweb("GBR_NP", item = "E0per", username = userInput(), password = userInput())
 
-dta_tidy <- dta %>% 
+# Now 201&
+# link here: https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/adhocs/0091452017singleyearnationallifetables
+# https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/adhocs/0091452017singleyearnationallifetables/2017singleyearlifetables.xls
+
+# Saved to data 
+# The only items needed are 
+# e0 male   : 77.13
+# e0 female : 81.16
+
+# Population from here: 
+
+# https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/analysisofpopulationestimatestool
+
+
+# For total, need male and female population in 2017
+
+# According to wolfram alpha:
+# https://www.wolframalpha.com/input/?i=UK+population+2017+by+sex
+# male: 31.9 million
+# female: 32.82 million
+
+e0_total <- (79.23 * 31.9 + 82.98 * 32.82) / (31.9 + 32.82)
+
+
+dta_tidy <- dta_uk %>% 
   as_tibble() %>% 
   magrittr::set_names(tolower(names(.))) %>% 
   gather(-year, key = "sex", value = "e0")
 
-# for now just want total 
-
-dta_total <- 
+dta_tidy <- 
   dta_tidy %>% 
-  filter(sex == "total") %>% 
-  arrange(year) %>% 
-  mutate(ch_e0 = e0 - lag(e0))
-
-
-# To start with: ch_e0 from 1990 to 2012
-
-prev_params <- 
-  dta_total %>% 
-  filter(between(year, 1991, 2012)) %>% 
-  summarise(
-    mu  = mean(ch_e0),
-    sig = sd(ch_e0) 
+  bind_rows(
+    tribble(
+      ~year, ~sex, ~e0,
+      2017, "female", 82.98,
+      2017, "male"  , 79.23, 
+      2017, "total" , e0_total 
+    )
   )
 
-new_x <- 
-  dta_total %>% 
-  filter(year > 2012) %>% 
-  pull(ch_e0)
-
-ll_noslowdown <- get_ll(x = new_x, mu = pull(prev_params, "mu"), sig_sq = pull(prev_params, "sig") ^ 2)
-
-# Create vector of various slowdown scenarios 
-
-pull(prev_params, "mu")
-
-scenarios_df <- 
-  tibble(
-    perc = seq(from = 1, to =0, by = -0.01)
-  ) %>% 
-  mutate(
-    mu = pull(prev_params, "mu") * perc
-  ) %>% 
-  mutate(
-    ll = map_dbl(mu, ~get_ll(mu = ., x = new_x, sig_sq = pull(prev_params, "sig") ^ 2))
-  ) %>% 
-  mutate(bayes_factor = exp(ll) /  exp(ll_noslowdown))
-
-
-ggplot(
-  scenarios_df, 
-  aes(y = bayes_factor, x = perc)
-) + 
-  geom_line() 
-
-# + 
-#   scale_y_log10(breaks = c(1/2, 1, 2, 5, 10), limits = c(0.5, 10))
-
-# This has the shape I was expecting, but the magnitude was much less than I was expecting 
-# With the log scale it just looks like a flat line 
-
-
-# Let's build a function for automating some of the above 
-
-# pre_years, post_years 
-
-
-# How about? 
-
-# Adding last available year? 
-
-
-
-tibble(
-  period = c("2013", "2013-14", "2013-15", "2013-16"),
-  after_end = 2013:2016
-) %>% 
-  mutate(
-    bayes_df = map(
-      after_end, ~calc_bayes_factors(after_period = c(2013, .), before_period = c(1990, 2012), outcome_var = ch_e0, dta = dta_total)
-    )
-  ) %>% 
-  select(-after_end) %>% 
-  unnest() %>% 
-  ggplot(aes(x = perc, y = bayes_factor, group = period, colour = period)) + 
-  geom_line()
 
 # by gender
 
@@ -157,7 +113,7 @@ dta_tidy %>%
   arrange(year) %>% 
   mutate(ch_e0 = e0 - lag(e0)) %>% 
   nest() %>% 
-  crossing(after_end = 2013:2016) %>% 
+  crossing(after_end = 2013:2017) %>% 
   mutate(
     bayes_df = map2(
       after_end, data, ~calc_bayes_factors(after_period = c(2013, .x), before_period = c(1990, 2012), outcome_var = ch_e0, dta = .y)
@@ -204,24 +160,44 @@ dta_usa %>%
 
 dta_enw <- HMDHFDplus::readHMDweb("GBRTENW", item = "E0per", username = userInput(), password = userInput()) 
 
+# e0 male: 79.53
+# e0 female: 83.19
+
+# population in 2017
+
+# male: 29021253 
+# female: 29723342 
+
+pop_male_2017   <- 29021253
+pop_female_2017 <- 29723342
+e0_enw_total    <- (79.53 * pop_male_2017 + 83.19 * pop_female_2017 ) / (pop_male_2017 + pop_female_2017)
+
 dta_enw %>% 
   as_tibble() %>% 
   magrittr::set_names(tolower(names(.))) %>% 
   gather(-year, key = "sex", value = "e0") %>% 
+  bind_rows(
+    tribble(
+      ~year, ~sex, ~e0,
+      2017, "male", 79.53,
+      2017, "female", 83.19,
+      2017, "total", e0_enw_total
+    )
+  ) %>% 
   group_by(sex) %>% 
   arrange(year) %>% 
   mutate(ch_e0 = e0 - lag(e0)) %>% 
   nest() %>% 
-  crossing(after_end = 2012:2017) %>% 
+  crossing(after_end = 2013:2017) %>% 
   mutate(
     bayes_df = map2(
-      after_end, data, ~calc_bayes_factors(after_period = c(2012, .x), before_period = c(1990, 2011), 
+      after_end, data, ~calc_bayes_factors(after_period = c(2013, .x), before_period = c(1990, 2012), 
                                            outcome_var = ch_e0, dta = .y)
     )
   ) %>%
   select(sex, after_end, bayes_df) %>% 
   unnest() %>% 
-  ggplot(aes(x = perc, y = bayes_factor, group = after_end, colour = after_end)) + 
+  ggplot(aes(x = perc, y = bayes_factor, group = after_end, colour = factor(after_end))) + 
   geom_line() +
   facet_wrap(~sex) + 
   geom_hline(yintercept = 1) +
