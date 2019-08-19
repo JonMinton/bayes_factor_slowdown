@@ -1,0 +1,352 @@
+---
+title: "Devil's Advocacy"
+author: "Jon Minton"
+date: "15 August 2019"
+output: html_document
+---
+
+# Introduction
+
+The Bayes Factor approach has been used to test for both the likelihood and magnitude of various proposed levels of life expectancy slowdown. By assuming that 1990-2012 is the 'before slowdown' period and the years after the 'after-slowdown' period. After combining five successive observations, annual changes in life expectancy, a Bayes Factor of around 1.003 was produced for a proposed slowdown of around 77% of previous levels. 
+
+The exercise followed from trying to formalise an intuitive 'reading' of the life expectancy series for the UK, which is that the curve in life expectancy looks much 'flatter' after around 2012 than from 1990 up to that year. Five observations, annual changes since 2012, were used to investivate the relative likelihood of a slowdown compared with no slowdown. 
+
+However, looking at the time series of life expectancy over time, there appears to be another way of interpreting the series. This is that life expectancy gains briefly *increased* after the 2008 recession, before *returning to their previous trajectory* in the last few years. Graphically, the two proposed interpretations can be represented as follows
+
+```{r}
+source("scripts/load_packages_and_functions.R")
+
+e0_uk <- read_csv("data/e0_uk.csv")
+
+
+```
+
+# The slowdown interpretation 
+
+
+```{r}
+e0_uk %>% 
+  filter(year >= 1990) %>% 
+  mutate(period = case_when(
+    year <= 2012     ~ "Before slowdown",
+    year > 2012      ~ "After slowdown"
+  )) %>% 
+  ggplot(aes(x = year, y = e0, group = sex, colour = sex, linetype = sex)) +
+  geom_point() + 
+  stat_smooth(aes(x = year, y = e0, group = paste0(sex, period), colour = sex, linetype = sex), 
+              method = "lm", se = F) + 
+  labs(x = "Year", y = "Period life expectancy at birth",
+       title = "Slowdown interpretation",
+       caption = "Sources: HMD; ONS for 2017") + 
+  geom_vline(xintercept = 2012) + 
+  annotate(geom = "text", x = 2012, y = 75, label = "2012", colour = "darkred", angle = 90) + 
+  scale_x_continuous(breaks = seq(1990, 2015, by = 5))
+
+```
+
+
+
+# The GFC 'bump' interpretation
+
+```{r}
+e0_uk %>% 
+  filter(year >= 1990) %>% 
+  mutate(period = case_when(
+    between(year, 2009, 2014) ~ "GFC Bump",
+    TRUE                      ~ "Improvement as usual"
+  )) %>% 
+  ggplot(aes(x = year, y = e0, group = sex, colour = sex, linetype = sex)) +
+  geom_point() + 
+  stat_smooth(aes(x = year, y = e0, group = paste0(sex, period), colour = sex, linetype = sex), 
+              method = "lm", se = F) + 
+  labs(x = "Year", y = "Period life expectancy at birth",
+       title = "GFC Bump Interpretation",
+       caption = "Sources: HMD; ONS for 2017") + 
+  geom_vline(xintercept = 2009) + 
+  geom_vline(xintercept = 2014) + 
+  scale_x_continuous(breaks = seq(1990, 2015, by = 5))
+
+```
+
+
+Both of these interpetations are based on the same number of continuous observations of values that appear discordant with the overall series. Both interpretations also appear theoretically justifiable: Whereas the proposed mechanism for the slowdown interpretation is that Austerity implemented in the post-GFC period has led to a substantial deterioration of health and social care services, with consequent adverse effects on population health, the proposed mechanism for the GFC bump would be that reductions in dependable disposible income would lead to, on the average, a higher proportion of personal spend being salugenic rather than pathogenic. 
+
+As with the previous exercise, we can also look at the series of annual changes in life expectancy, highlighting as points those observations we propose are discortant with the overall series. 
+
+
+
+```{r}
+e0_uk %>% 
+  group_by(sex) %>% 
+  arrange(year) %>% 
+  mutate(ch_e0 = e0 - lag(e0)) %>% 
+  filter(year >= 1990) %>% 
+  ggplot(aes(x = year, y = ch_e0)) +
+  geom_line() + 
+  geom_point(aes(x = year, y= ch_e0), inherit.aes = FALSE, 
+             data = . %>% filter(between(year, 2009, 2013))
+  ) +
+  labs(x = "Year", y = "Change in life expectancy from previous year",
+       title = "Annual changes in life expectancy in the UK since 1990",
+       caption = "Sources: HMD; ONS for 2017") + 
+  geom_vline(xintercept = 2008) +   geom_vline(xintercept = 2014) + 
+  scale_x_continuous(breaks = seq(1990, 2015, by = 5)) + 
+  geom_hline(yintercept = 0) +
+  facet_grid(sex ~ .) + 
+  theme_minimal()
+
+```
+
+Of these five observations, the last two do not like particular 'good' years, with a small decline in life expectancy observed for one year for females. Also the improvement years are not higher than those observed since 1990 previously. However, the use of five observations makes meaningful comparison with the previous exercise more straightforward. 
+
+
+Let's now calculate the average change and standard deviation around this for the series excluding these five points. This will form the new Null model specification. 
+
+
+```{r}
+devils_summaries <- 
+  e0_uk %>% 
+    group_by(sex) %>% 
+    arrange(year) %>% 
+    mutate(ch_e0 = e0 - lag(e0)) %>% 
+    filter(year >= 1990) %>%
+    filter(!between(year, 2009, 2013)) %>% 
+    group_by(sex) %>% 
+    summarise(mu_ch = mean(ch_e0), 
+              var_ch = var(ch_e0)
+    )
+
+devils_summaries
+```
+
+
+The means are somewhat lower than previously calculated; the variances are similar 
+
+# Bayes factors 
+
+```{r}
+e0_uk_bf <- 
+  e0_uk %>% 
+  group_by(sex) %>% 
+  arrange(year) %>% 
+  mutate(ch_e0 = e0 - lag(e0)) %>% 
+  nest() %>% 
+  crossing(drop_end = 2008:2013) %>% 
+  mutate(
+    bayes_df = map2(
+      drop_end, data, ~calc_devils_bayes_factors(drop_period = c(2008, .x), full_period = c(1990, 2016), outcome_var = ch_e0, dta = .y)
+    )
+  ) %>%
+  select(sex, drop_end, bayes_df) %>% 
+  unnest() %>% 
+  mutate(
+    period = paste0("2008-", str_sub(drop_end, 3,4))
+  ) 
+
+```
+First year only 
+
+
+```{r}
+
+e0_uk_bf %>% 
+  filter(period == "2008-09") %>% 
+  mutate(perc = 100 * perc) %>% 
+  ggplot(aes(x = perc, y = bayes_factor)) +
+  geom_line() + 
+  geom_ribbon(aes(ymin = 1, x = perc, ymax = bayes_factor), 
+              data = e0_uk_bf %>% 
+                filter(period == "2008-09") %>% 
+                mutate(perc = 100 * perc),
+              inherit.aes = FALSE, fill = "skyblue", alpha = 0.2) + 
+  facet_wrap(~sex) +
+  scale_y_continuous(limits = c(0.999, 1.005), 
+                     breaks = seq(0.999, 1.0050, by = 0.001)
+                       
+                       ) +
+  geom_hline(yintercept = 1) + 
+  labs(
+    x = "Percentage of previous improvement",
+    y = "Bayes Factor\n(>1 means support for Alternative Hypothesis",
+    title = "Bayes Factor for various proposed levels of GFC Speedup"
+  )
+```
+
+Now let's do that for the subsequent years 
+
+```{r}
+
+e0_uk_bf %>% 
+  filter(period %in% c("2008-09", "2008-10")) %>% 
+  mutate(perc = 100 * perc) %>% 
+  ggplot(aes(x = perc, y = bayes_factor, alpha = period)) +
+  geom_line() + 
+  geom_ribbon(aes(
+      ymin = ifelse(is_pos, 1, bayes_factor), 
+      ymax = ifelse(is_pos, bayes_factor, 1), 
+      x = perc, group = paste0(is_pos, period),
+      fill = is_pos
+    ), 
+              data = e0_uk_bf %>% 
+                filter(period %in% c("2008-09", "2008-10")) %>% 
+                mutate(perc = 100 * perc) %>%
+                mutate(is_pos = bayes_factor > 1),
+              inherit.aes = FALSE, alpha = 0.2) + 
+  facet_wrap(~sex) +
+  scale_y_continuous(limits = c(0.999, 1.005), 
+                     breaks = seq(0.999, 1.0050, by = 0.001)
+                       
+                       ) +
+  scale_alpha_discrete("Period", range = c(0.5, 1), breaks = c("2008-09", "2008-10")) +
+  geom_hline(yintercept = 1) + 
+  labs(
+    x = "Percentage of previous improvement",
+    y = "Bayes Factor\n(>1 means support for Alternative Hypothesis",
+    title = "Bayes Factor for various proposed levels of slowdown",
+    subtitle = "Based on periods 2008-09, and 2008-10"
+  ) +
+  guides(fill = FALSE)
+```
+
+```{r}
+
+e0_uk_bf %>% 
+  filter(period %in% c("2008-09", "2008-10", "2008-11")) %>% 
+  mutate(perc = 100 * perc) %>% 
+  ggplot(aes(x = perc, y = bayes_factor, alpha = period)) +
+  geom_line() + 
+  geom_ribbon(aes(
+      ymin = ifelse(is_pos, 1, bayes_factor), 
+      ymax = ifelse(is_pos, bayes_factor, 1), 
+      x = perc, group = paste0(is_pos, period),
+      fill = is_pos
+    ), 
+              data = e0_uk_bf %>% 
+                filter(period %in% c("2008-09", "2008-10", "2008-11")) %>% 
+                mutate(perc = 100 * perc) %>%
+                mutate(is_pos = bayes_factor > 1),
+              inherit.aes = FALSE, alpha = 0.2) + 
+  facet_wrap(~sex) +
+  scale_y_continuous(limits = c(0.999, 1.005), 
+                     breaks = seq(0.999, 1.0050, by = 0.001)
+                       
+                       ) +
+  scale_alpha_discrete("Period", range = c(0.5, 1), breaks = c("2008-09", "2008-10", "2008-11")) +
+  geom_hline(yintercept = 1) + 
+  labs(
+    x = "Percentage of previous improvement",
+    y = "Bayes Factor\n(>1 means support for Alternative Hypothesis",
+    title = "Bayes Factor for various proposed levels of slowdown",
+    subtitle = "Based on periods 2008-09 to 2008-11"
+  ) +
+  guides(fill = FALSE)
+```
+
+```{r}
+
+e0_uk_bf %>% 
+  filter(period %in% c("2008-09", "2008-10", "2008-11", "2008-12")) %>% 
+  mutate(perc = 100 * perc) %>% 
+  ggplot(aes(x = perc, y = bayes_factor, alpha = period)) +
+  geom_line() + 
+  geom_ribbon(aes(
+      ymin = ifelse(is_pos, 1, bayes_factor), 
+      ymax = ifelse(is_pos, bayes_factor, 1), 
+      x = perc, group = paste0(is_pos, period),
+      fill = is_pos
+    ), 
+              data = e0_uk_bf %>% 
+                filter(period %in% c("2008-09", "2008-10", "2008-11", "2008-12")) %>% 
+                mutate(perc = 100 * perc) %>%
+                mutate(is_pos = bayes_factor > 1),
+              inherit.aes = FALSE, alpha = 0.2) + 
+  facet_wrap(~sex) +
+  scale_y_continuous(limits = c(0.999, 1.005), 
+                     breaks = seq(0.999, 1.0050, by = 0.001)
+                       
+                       ) +
+  scale_alpha_discrete("Period", range = c(0.5, 1), breaks = c("2008-09", "2008-10", "2008-11", "2008-12")) +
+  geom_hline(yintercept = 1) + 
+  labs(
+    x = "Percentage of previous improvement",
+    y = "Bayes Factor\n(>1 means support for Alternative Hypothesis",
+    title = "Bayes Factor for various proposed levels of slowdown",
+    subtitle = "Based on periods 2008-09 to 2008-12"
+  ) +
+  guides(fill = FALSE)
+```
+
+
+
+```{r}
+
+e0_uk_bf %>% 
+  filter(period %in% c("2008-09", "2008-10", "2008-11", "2008-12", "2008-13")) %>% 
+  mutate(perc = 100 * perc) %>% 
+  ggplot(aes(x = perc, y = bayes_factor, alpha = period)) +
+  geom_line() + 
+  geom_ribbon(aes(
+      ymin = ifelse(is_pos, 1, bayes_factor), 
+      ymax = ifelse(is_pos, bayes_factor, 1), 
+      x = perc, group = paste0(is_pos, period),
+      fill = is_pos
+    ), 
+              data = e0_uk_bf %>% 
+                filter(period %in% c("2008-09", "2008-10", "2008-11", "2008-12", "2008-13")) %>% 
+                mutate(perc = 100 * perc) %>%
+                mutate(is_pos = bayes_factor > 1),
+              inherit.aes = FALSE, alpha = 0.2) + 
+  facet_wrap(~sex) +
+  scale_y_continuous(limits = c(0.999, 1.005), 
+                     breaks = seq(0.999, 1.0050, by = 0.001)
+                       
+                       ) +
+  scale_alpha_discrete("Period", range = c(0.5, 1), breaks = c("2008-09", "2008-10", "2008-11", "2008-12", "2008-13")) +
+  geom_hline(yintercept = 1) + 
+  labs(
+    x = "Percentage of previous improvement",
+    y = "Bayes Factor\n(>1 means support for Alternative Hypothesis",
+    title = "Bayes Factor for various proposed levels of slowdown",
+    subtitle = "Based on periods 2008-09 to 2008-13"
+  ) +
+  guides(fill = FALSE)
+```
+
+
+And just for the whole series
+
+
+```{r}
+
+e0_uk_bf %>% 
+  filter(period == "2008-13") %>% 
+  mutate(perc = 100 * perc) %>% 
+  ggplot(aes(x = perc, y = bayes_factor)) +
+  geom_line() + 
+  geom_ribbon(aes(
+      ymin = ifelse(is_pos, 1, bayes_factor), 
+      ymax = ifelse(is_pos, bayes_factor, 1), 
+      x = perc, group = paste0(is_pos, period),
+      fill = is_pos
+    ), 
+              data = e0_uk_bf %>% 
+                filter(period == "2008-13") %>% 
+                mutate(perc = 100 * perc) %>%
+                mutate(is_pos = bayes_factor > 1),
+              inherit.aes = FALSE, alpha = 0.2) + 
+  facet_wrap(~sex) +
+  scale_y_continuous(limits = c(0.997, 1.005), 
+                     breaks = seq(0.997, 1.0050, by = 0.001)
+                       
+                       ) +
+  geom_hline(yintercept = 1) + 
+  labs(
+    x = "Percentage of previous improvement",
+    y = "Bayes Factor\n(>1 means support for Alternative Hypothesis",
+    title = "Bayes Factor for various proposed levels of slowdown",
+    subtitle = "Based on periods 2008-09 to 2008-13"
+  ) +
+  guides(fill = FALSE)
+```
+
+```
