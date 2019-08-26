@@ -21,8 +21,7 @@ e0_uk <- read_csv("data/e0_uk.csv")
 
 ```
 
-# The slowdown interpretation 
-
+The Slowdown interpretation, which the majority of research to date has focused on, proposes that, after a certain date (2012), the rate of annual improvement in life expectancy has slowed. Graphically, this is presented as two discontinuous lines of life expectancy over time, a higher improvement rate period, covering 1990-2012, and a lower improvement (or even zero improvement) rate period, for those years after 2012. This looks as follows:
 
 ```{r}
 e0_uk %>% 
@@ -44,9 +43,7 @@ e0_uk %>%
 
 ```
 
-
-
-# The GFC 'bump' interpretation
+Another possible interpretation of the same data is that the last period is broadly typical of improvement rates over the whole period. Instead, the 'atypical' period was in the years immediately following the 2008 recession, during which life expectancy improvement rates briefly *increased*. Under this interpretation, the apparent flattening in the curve is due to a relatively typical period of life expectancy improvmeent following an atypically *good* period of improvement, rather than being a genuine slowdown from a typical to a slow improvement period. Graphically, this alternative reading of the data looks as follows:
 
 ```{r}
 e0_uk %>% 
@@ -69,11 +66,13 @@ e0_uk %>%
 ```
 
 
-Both of these interpetations are based on the same number of continuous observations of values that appear discordant with the overall series. Both interpretations also appear theoretically justifiable: Whereas the proposed mechanism for the slowdown interpretation is that Austerity implemented in the post-GFC period has led to a substantial deterioration of health and social care services, with consequent adverse effects on population health, the proposed mechanism for the GFC bump would be that reductions in dependable disposible income would lead to, on the average, a higher proportion of personal spend being salugenic rather than pathogenic. 
+Both of these interpetations are based on the same number of continuous observations of values that appear discordant with the overall series. Both interpretations also appear theoretically justifiable: Whereas the proposed mechanism for the slowdown interpretation is that Austerity implemented in the post-GFC period has led to a substantial deterioration of health and social care services, with consequent adverse effects on population health, the proposed mechanism for the GFC bump would be that reductions in dependable disposible income would lead to, on the average, a higher proportion of personal spend being salugenic rather than pathogenic. The most obvious example of this would be if, as a result of having less disposible income, the UK population cannot afford to drive as much, and so faces a reduced exposure to vehicle-related mortality. Another example would include reduced alcohol consumption, and so a reduced hazard of alcohol-related mortality. In the conclusion of this document, some of the testable implications of the GFC 'bump' hypothesis will be considered further. 
 
-As with the previous exercise, we can also look at the series of annual changes in life expectancy, highlighting as points those observations we propose are discortant with the overall series. 
+# Graphs of annual change 
 
+Both the Slowdown and the GFC Bump interpretations can be expressed through graphs of annual changes in life expectancy, rather than life expectancy alone. In both graphs of annual change, points are added to some line segments. These indicate the points that are considered 'atypical' from the perspective of the interpretation under consideration. 
 
+The graph showing annual changes under the GFC Bump interpretation is shown in the following: 
 
 ```{r}
 e0_uk %>% 
@@ -120,9 +119,14 @@ devils_summaries
 ```
 
 
-The means are somewhat lower than previously calculated; the variances are similar 
+The means are somewhat lower than previously calculated (under the Slowdown interpretation); the variances are similar 
 
 # Bayes factors 
+
+As when evaluating the Slowdown interpretion, the GFC Bump interpretation compares the relative likelihood of the assumption that life expectancy changes in the 'atypical' period were different from those in the 'typical' period, to the assumption that they were the same. Unlike with the Slowdown interpretation, the proposed differences are all higher rather than lower than the 'typical' period, with proposed improvement levels between 100% and 200% of their 'typical period' levels. 
+
+Using the first year of the atypical period under the GFC Bump interpretion alone, the Bayes Factor schedule looks as follows:
+
 
 ```{r}
 e0_uk_bf <- 
@@ -154,11 +158,12 @@ e0_uk_bf %>%
   mutate(perc = 100 * perc) %>% 
   ggplot(aes(x = perc, y = bayes_factor)) +
   geom_line() + 
-  geom_ribbon(aes(ymin = 1, x = perc, ymax = bayes_factor), 
+  geom_ribbon(aes(ymin = 1, x = perc, ymax = bayes_factor,fill = is_pos), 
               data = e0_uk_bf %>% 
                 filter(period == "2008-09") %>% 
-                mutate(perc = 100 * perc),
-              inherit.aes = FALSE, fill = "skyblue", alpha = 0.2) + 
+                mutate(perc = 100 * perc) %>%
+                mutate(is_pos = bayes_factor > 1),
+              inherit.aes = FALSE, alpha = 0.2) + 
   facet_wrap(~sex) +
   scale_y_continuous(limits = c(0.999, 1.005), 
                      breaks = seq(0.999, 1.0050, by = 0.001)
@@ -169,10 +174,13 @@ e0_uk_bf %>%
     x = "Percentage of previous improvement",
     y = "Bayes Factor\n(>1 means support for Alternative Hypothesis",
     title = "Bayes Factor for various proposed levels of GFC Speedup"
-  )
+  ) + 
+  guides(fill = FALSE)
 ```
 
-Now let's do that for the subsequent years 
+This first observation provides very slight support for the hypothesis that there was a post 2008 slowdown. However, it appears to provide slightly stronger support for a slowdown in females than males. This does not appear immediately consonant with the most plausible mechanisms for a recessionary 'bump' in life expectancy, which may be expected to lead to greater improvements in males than females, as most of the pathogenic behaviours that a fall in discretionary spend may be assumed to curtail generally tend to affect male mortality hazards (due to higher baseline risks) than female mortality hazards. (A converse case could also be made, however: the effect of a recession can be expected to reduce discretionary spend, leading to faster rates of improvement in males than females, as males had previously converted more of their discretionary spend into pathogenic health behaviours; but also the effect of a recession can be expected to lead to more unemployment and under-employment, adversely affecting wellbeing in both genders, which in males tends to get converted into despair-related mortality, in particular drug-related deaths and suicide, at a higher rate than in females. There are threfore mechanisms by which a recession could lead to an expansion or a contraction in gender differences in mortality, and the above differences in schedules, based on a single obervation, are not conclusive in any way.)
+
+The following shows the effect of adding a second observation:
 
 ```{r}
 
@@ -208,6 +216,10 @@ e0_uk_bf %>%
   guides(fill = FALSE)
 ```
 
+With two observations, the support for any kind of GFC Bump has decreased, and the most likely quantity of the 'bump' has decreased - for females and total - as well. This might be expected if the Bump were inherently transient in nature, but if it were then this undermines the broader argument of the GFC Bump interpretation. Namely, that the effect of the bump on life expectancy were long enough to give the impression that a return to typical rates of improvement looks like a Slowdown. 
+
+The following figure adds the third observation in the series: 
+
 ```{r}
 
 e0_uk_bf %>% 
@@ -242,6 +254,11 @@ e0_uk_bf %>%
   guides(fill = FALSE)
 ```
 
+With the addition of this third observation, from 2010-2011, the support for a Bump has increased again, with no proposed level of improvement up to 200% of trend levels being 'less likely' than the hypothesis that there has been no improvement. 
+
+The following adds a forth observation, from 2011-2012.
+
+
 ```{r}
 
 e0_uk_bf %>% 
@@ -261,8 +278,8 @@ e0_uk_bf %>%
                 mutate(is_pos = bayes_factor > 1),
               inherit.aes = FALSE, alpha = 0.2) + 
   facet_wrap(~sex) +
-  scale_y_continuous(limits = c(0.999, 1.005), 
-                     breaks = seq(0.999, 1.0050, by = 0.001)
+  scale_y_continuous(limits = c(0.998, 1.005), 
+                     breaks = seq(0.998, 1.0050, by = 0.001)
                        
                        ) +
   scale_alpha_discrete("Period", range = c(0.5, 1), breaks = c("2008-09", "2008-10", "2008-11", "2008-12")) +
@@ -275,8 +292,9 @@ e0_uk_bf %>%
   ) +
   guides(fill = FALSE)
 ```
+With this forth observation, the support for the Bump interpretation has decreased, especially for females. The most likely level of improvement has also fallen, and many higher rates of proposed improvement are now less likely than the No Improvement hypothesis. (Red region below 1.000. The scale has been adjusted to allow the full schedule to be shown)
 
-
+Finally, the following shows the effect of incorporating the fifth observation, from 2012-2013.
 
 ```{r}
 
@@ -297,8 +315,8 @@ e0_uk_bf %>%
                 mutate(is_pos = bayes_factor > 1),
               inherit.aes = FALSE, alpha = 0.2) + 
   facet_wrap(~sex) +
-  scale_y_continuous(limits = c(0.999, 1.005), 
-                     breaks = seq(0.999, 1.0050, by = 0.001)
+  scale_y_continuous(limits = c(0.996, 1.005), 
+                     breaks = seq(0.996, 1.0050, by = 0.001)
                        
                        ) +
   scale_alpha_discrete("Period", range = c(0.5, 1), breaks = c("2008-09", "2008-10", "2008-11", "2008-12", "2008-13")) +
@@ -311,9 +329,9 @@ e0_uk_bf %>%
   ) +
   guides(fill = FALSE)
 ```
+The lower part of the scale has been expanded further because the lower bounds of the estimated Bayes Factors is even lower. With five full observations, there now appears to be very little evidence of a sustained GFC Bump.
 
-
-And just for the whole series
+The final figure shows only the schedule based on all five observations.
 
 
 ```{r}
@@ -335,8 +353,8 @@ e0_uk_bf %>%
                 mutate(is_pos = bayes_factor > 1),
               inherit.aes = FALSE, alpha = 0.2) + 
   facet_wrap(~sex) +
-  scale_y_continuous(limits = c(0.997, 1.005), 
-                     breaks = seq(0.997, 1.0050, by = 0.001)
+  scale_y_continuous(limits = c(0.996, 1.005), 
+                     breaks = seq(0.996, 1.0050, by = 0.001)
                        
                        ) +
   geom_hline(yintercept = 1) + 
@@ -349,4 +367,9 @@ e0_uk_bf %>%
   guides(fill = FALSE)
 ```
 
-```
+# Discussion
+
+With five continuous observations, the evidence is against a GFC Bump interpetation of the UK life expectancy series since 1990. The Bayes Factor maximises at around a 15% improvement rate, with a maximum Bayes Factor of around 1.0001. This compares with a Bayes Factor for the Slowdown Hypothesis, also based on five observations, which maximises at around 1.003, when a slowdown to around 20% of pre-slowdown levels is assumed. 
+
+As the two interpretations are not being directly compared, and the Null hypotheses considered in both interpretations are different, it is probably theoretically inappropriate to conclude, on the basis of this, that the data provide around 30 times (1.003 / 1.0001) more support for the Slowdown interpretation than the GFC Bump interpetation. However, the results of this exercise in 'Devil's Advocacy' do not appear to provide a strong case for preferring the GFC Bump interpretation over the Slowdown interpretation of recent UK life expectancy trends in a longer-term context. The evidence does not appear to be 'moot' with regards to how convincing these two interpretations are. 
+
