@@ -2,7 +2,9 @@
 title: "Devil's Advocacy"
 author: "Jon Minton"
 date: "15 August 2019"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 # Introduction
@@ -134,6 +136,7 @@ e0_uk_bf <-
   group_by(sex) %>% 
   arrange(year) %>% 
   mutate(ch_e0 = e0 - lag(e0)) %>% 
+  filter(year >= 1990) %>%
   nest() %>% 
   crossing(drop_end = 2008:2013) %>% 
   mutate(
