@@ -313,4 +313,5 @@ $$
 \frac{L(g(\theta_{alt}) | X)}{L(g(\theta_{null})|X)}
 $$
 
+Note that the alternative and null model specifications both contain a number of parameters in the Log likelihood that are identical. This includes $\frac{n}{2}log(2\pi)$ and $n log(\sigma)$ (because we are not concerned about testing proposed difference in the variance before and after). This means Bayes Factor could be calculated without including these parameters. However, they have been included for completeness. 
 
