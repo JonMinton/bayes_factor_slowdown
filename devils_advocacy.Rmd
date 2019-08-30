@@ -5,6 +5,7 @@ date: "15 August 2019"
 output:
   pdf_document: default
   html_document: default
+  word_document: default
 ---
 
 # Introduction
@@ -295,6 +296,7 @@ e0_uk_bf %>%
   ) +
   guides(fill = FALSE)
 ```
+
 With this forth observation, the support for the Bump interpretation has decreased, especially for females. The most likely level of improvement has also fallen, and many higher rates of proposed improvement are now less likely than the No Improvement hypothesis. (Red region below 1.000. The scale has been adjusted to allow the full schedule to be shown)
 
 Finally, the following shows the effect of incorporating the fifth observation, from 2012-2013.
@@ -374,5 +376,5 @@ e0_uk_bf %>%
 
 With five continuous observations, the evidence is against a GFC Bump interpetation of the UK life expectancy series since 1990. The Bayes Factor maximises at around a 15% improvement rate, with a maximum Bayes Factor of around 1.0001. This compares with a Bayes Factor for the Slowdown Hypothesis, also based on five observations, which maximises at around 1.003, when a slowdown to around 20% of pre-slowdown levels is assumed. 
 
-As the two interpretations are not being directly compared, and the Null hypotheses considered in both interpretations are different, it is probably theoretically inappropriate to conclude, on the basis of this, that the data provide around 30 times (1.003 / 1.0001) more support for the Slowdown interpretation than the GFC Bump interpetation. However, the results of this exercise in 'Devil's Advocacy' do not appear to provide a strong case for preferring the GFC Bump interpretation over the Slowdown interpretation of recent UK life expectancy trends in a longer-term context. The evidence does not appear to be 'moot' with regards to how convincing these two interpretations are. 
+As the two interpretations are not being directly compared, and the Null hypotheses considered in both interpretations are different, it is probably theoretically inappropriate to conclude, on the basis of this, that the data provide around 30 times (1.003 / 1.0001) more support for the Slowdown interpretation than the GFC Bump interpetation. However, the results of this exercise in 'Devil's Advocacy' do not appear to provide a strong case for preferring the GFC Bump interpretation over the Slowdown interpretation of recent UK life expectancy trends in a longer-term context. The evidence does not appear to be 'moot' with regards to how convincing these two interpretations are. Put another way, the data are not a Duck-Rabbit, which can be interpreted equally plausibly as either a 'Duck' (GFC Bump) or a 'Rabbit' (Slowdown).  
 
