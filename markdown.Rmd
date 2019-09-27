@@ -109,7 +109,7 @@ e0_uk_bf <-
   arrange(year) %>% 
   mutate(ch_e0 = e0 - lag(e0)) %>% 
   nest() %>% 
-  crossing(after_end = 2013:2017) %>% 
+  crossing(after_end = 2013:2018) %>% 
   mutate(
     bayes_df = map2(
       after_end, data, ~calc_bayes_factors(after_period = c(2013, .x), before_period = c(1990, 2012), outcome_var = ch_e0, dta = .y)
@@ -214,13 +214,13 @@ e0_uk_bf %>%
                      breaks = seq(0.999, 1.0050, by = 0.001)
                        
                        ) +
-  scale_alpha_discrete("Period", range = c(0.2, 1), breaks = c("2012-13", "2012-14", "2012-15", "2012-16", "2012-17")) +
+  scale_alpha_discrete("Period", range = c(0.2, 1), breaks = c("2012-13", "2012-14", "2012-15", "2012-16", "2012-17", "2012-18")) +
   geom_hline(yintercept = 1) + 
   labs(
     x = "Percentage of previous improvement",
     y = "Bayes Factor\n(>1 means support for Alternative Hypothesis",
     title = "Bayes Factor for various proposed levels of slowdown",
-    subtitle = "Based on all series up to 2012-17"
+    subtitle = "Based on all series up to 2012-18"
   ) +
   guides(fill = FALSE)
 
@@ -232,9 +232,18 @@ We can see from this that, with the addition of the annual change from 2014-15, 
 ```{r}
 e0_uk_bf %>% 
   mutate(perc = 100 * perc) %>%
-  filter(period == "2012-17") %>% 
+  filter(period == "2012-18") %>% 
   ggplot(aes(x = perc, y = bayes_factor)) +
   geom_line() + 
+  geom_line(
+    aes(x = perc, y = bayes_factor),
+    e0_uk_bf %>% 
+      mutate(perc = 100 * perc) %>% 
+      mutate(is_pos = bayes_factor > 1) %>% 
+      filter(period == "2012-17") ,
+    inherit.aes = FALSE,
+    linetype = "dashed"
+  ) + 
   geom_ribbon(aes(
       ymin = ifelse(is_pos, 1, bayes_factor), 
       ymax = ifelse(is_pos, bayes_factor, 1), 
@@ -244,11 +253,11 @@ e0_uk_bf %>%
               data = e0_uk_bf %>% 
                 mutate(perc = 100 * perc) %>%
                 mutate(is_pos = bayes_factor > 1) %>% 
-                filter(period == "2012-17") ,
+                filter(period == "2012-18") ,
               inherit.aes = FALSE, alpha = 0.2) + 
   facet_wrap(~sex) +
-  scale_y_continuous(limits = c(0.999, 1.005), 
-                     breaks = seq(0.999, 1.0050, by = 0.001)
+  scale_y_continuous(limits = c(0.999, 1.006), 
+                     breaks = seq(0.999, 1.0060, by = 0.001)
                        
                        ) +
   geom_hline(yintercept = 1) + 
@@ -256,13 +265,13 @@ e0_uk_bf %>%
     x = "Percentage of previous improvement",
     y = "Bayes Factor\n(>1 means support for Alternative Hypothesis",
     title = "Bayes Factor for various proposed levels of slowdown",
-    subtitle = "Based on complete series up to 2012-17"
+    subtitle = "Based on complete series up to 2012-18. Dashed line: 2012-17"
   ) +
   guides(fill = FALSE) + 
   geom_text(
     data = e0_uk_bf %>%
       mutate(perc = 100 * perc) %>% 
-      filter(after_end == 2017) %>% 
+      filter(after_end == 2018) %>% 
       group_by(sex) %>% 
       filter(bayes_factor == max(bayes_factor)) %>% 
       mutate(text = paste0("Maximized at\n", 100 -  round(perc, 0), "% slowdown")),
@@ -270,7 +279,10 @@ e0_uk_bf %>%
     inherit.aes = FALSE, size = 2.5
   )
 
+
+ggsave("figures/bayes_factor_2018_update.png", dpi = 300, height = 15, width = 25, units = "cm")
 ```
+
 
 
 # Discussion/Conclusion

@@ -4,9 +4,15 @@
 
 # getHMDcountries()
 
-dta_uk <- HMDHFDplus::readHMDweb(CNTRY = "GBR_NP", item = "E0per", username = userInput(), password = userInput())
+#dta_uk <- HMDHFDplus::readHMDweb("GBR_NP", item = "E0per", username = userInput(), password = userInput())
 
-# Now 201&
+
+# Can't download this for now. Will fudge instead (for now)
+
+dta_e0_old <- read_csv("data/e0_uk.csv") %>% 
+  filter(!year %in% c(2017, 2018))
+
+# Now 2017
 # link here: https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/adhocs/0091452017singleyearnationallifetables
 # https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/adhocs/0091452017singleyearnationallifetables/2017singleyearlifetables.xls
 
@@ -67,13 +73,13 @@ p_female_2018 <- 33.74
 e0_total_2018 <- (e0_male_2018 * p_male_2018 + e0_female_2018 * p_female_2018) / (p_male_2018 + p_female_2018)
 
 
-dta_tidy <- dta_uk %>% 
-  as_tibble() %>% 
-  magrittr::set_names(tolower(names(.))) %>% 
-  gather(-year, key = "sex", value = "e0")
+# dta_tidy <- dta_uk %>% 
+#   as_tibble() %>% 
+#   magrittr::set_names(tolower(names(.))) %>% 
+#   gather(-year, key = "sex", value = "e0")
 
 dta_tidy <- 
-  dta_tidy %>% 
+  dta_e0_old %>% 
   bind_rows(
     tribble(
       ~year, ~sex, ~e0,
