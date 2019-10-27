@@ -101,6 +101,60 @@ e0_ch_summary
 
 ten_k_runs <- 
   e0_ch_summary %>% 
-    mutate(draws = map2(.x = mean_de0, .y = sd_de0, .f = ~rerun(10000, rnorm(n = 7, mean = .x, sd = .y))))
+    mutate(
+      draws = map2(
+        .x = mean_de0, .y = sd_de0, 
+        .f = ~replicate(10000, rnorm(n = 7, mean = .x, sd = .y))
+        )
+      ) %>% 
+  mutate(
+    draw_df = map(
+      draws,
+      ~.x %>% 
+        data.frame() %>% 
+        mutate(k = 1:n()) %>% 
+        gather(-k, key = "rep", value = "change") %>% 
+        mutate(rep = str_remove(rep, "X") %>% 
+                 as.numeric()
+        )               
+      )
+  ) %>% 
+  select(sex, draw_df) %>% 
+  unnest()
+
+set.seed(20)
+
+# a 1% sample 
+
+
+ten_k_runs %>% 
+  filter(rep %in% sample(1:10000, 100)) %>% 
+  ggplot(aes(x = k, y = change, group = rep)) +
+  facet_wrap(~sex) + 
+  geom_line(alpha = 0.2)
+
+# to accumulate with 2011 observation as 0th value 
+
+set.seed(20)
+
+ten_k_runs %>% 
+  left_join(dta_scot_tidy %>% filter(year == 2011) %>% select(-year)) %>% 
+  group_by(sex, rep) %>% 
+  arrange(k) %>% 
+  mutate(
+    cumulative_change = cumsum(change),
+    prediction        = e0 + cumulative_change
+  ) %>% 
+  ungroup() %>% 
+  filter(rep %in% sample(1:10000, 500)) %>% 
+  mutate(year = k + 2011) %>% 
+  left_join(
+    dta_scot_tidy %>% rename(obs_e0 = e0)
+  ) %>% 
+  ggplot(aes(x = year, y = prediction, group = rep)) + 
+  facet_wrap(~sex) + 
+  geom_line(alpha = 0.025) + 
+  geom_point(aes(y = obs_e0))
+
 
 
