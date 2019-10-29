@@ -446,3 +446,7 @@ ggsave("figures/trend_observed_percentiles_bothperiods.png", height = 15, width 
 
 
 
+## Now to something similar using mx instead of e0
+
+
+
