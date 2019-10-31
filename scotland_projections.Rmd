@@ -729,4 +729,44 @@ mx_data %>%
 
 ```
 
+Let's quickly look at how the variability varies against age
 
+```{r}
+mx_data %>%
+  filter(between(year, 1990, 2011)) %>% 
+  mutate(mx = mx + 1E-6) %>%  #continuity correction
+  select(x, sex, year, mx) %>% 
+  group_by(x, sex) %>% 
+  arrange(year) %>% 
+  mutate(lnmx = log(mx)) %>% 
+  mutate(d_lnmx = lnmx - lag(lnmx)) %>% 
+  summarise(
+    mean_ch = mean(d_lnmx, na.rm = TRUE),
+    sd_ch   = sd(d_lnmx, na.rm = TRUE)
+  ) %>% 
+  ungroup() %>% 
+  mutate(
+    var_ch = sd_ch ^ 2,
+    inv_var = 1/ var_ch,
+    norm_inv_var = inv_var / max(inv_var)
+  )  %>% 
+  ggplot(aes(x = x, y = mean_ch, alpha = norm_inv_var, group = sex, colour = sex, shape = sex)) + 
+  geom_point() +
+  labs(
+    x = "Age in single years", 
+    y = "Trend in mortality improvement at age",
+    title = "Average mortality improvement at individual ages, 1990-2011",
+    subtitle = "More solid colours indicate greater consistency in improvement rates"
+  ) +
+  geom_hline(yintercept = 0) +
+  guides(alpha = FALSE) +
+  scale_x_continuous(breaks = seq(0, 90, by = 10)) +
+  scale_y_continuous(limits = c(-0.10, 0.025), breaks = seq(-0.10, 0.02, by = 0.01))
+  
+
+```
+
+
+So, there's a relatively consistent rate of improvement, with comparatively low variability, between around age 55 and 80, as well as in infancy. From about age 80 onwards improvement rates become consistently smaller. In adulthood, from around age 20-45, mortality rate trends are often worsening rather than improving, however at most ages below 55 there is also greater annual variability, hence feinter points. 
+
+Also note the rates after 55 tend to be lower for males than females, consistent with this being a period of greater catch-up in mortality outcomes between the sexes. 
