@@ -1173,13 +1173,15 @@ allnations_next_decade_targets %>%
   group_by(population, sex, year) %>% 
   summarise(
     mean_pred = mean(prediction),
+    sd_pred   = sd(prediction),
     med_pred  = median(prediction),
     low_95   = quantile(prediction, 0.025),
     high_95  = quantile(prediction, 0.975),
     low_90   = quantile(prediction, 0.050),
     high_90  = quantile(prediction, 0.950)
   ) %>% 
-  ungroup()
+  ungroup() %>% 
+  write_csv("data/predictions_to_2028.csv")
 
 ```
 
