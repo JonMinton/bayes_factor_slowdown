@@ -770,3 +770,417 @@ mx_data %>%
 So, there's a relatively consistent rate of improvement, with comparatively low variability, between around age 55 and 80, as well as in infancy. From about age 80 onwards improvement rates become consistently smaller. In adulthood, from around age 20-45, mortality rate trends are often worsening rather than improving, however at most ages below 55 there is also greater annual variability, hence feinter points. 
 
 Also note the rates after 55 tend to be lower for males than females, consistent with this being a period of greater catch-up in mortality outcomes between the sexes. 
+
+# mx and ex for all nation from ONS 
+
+We'll now use the tables from [this location](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/singleyearlifetablesuk1980to2018) to get $e_0$, $m_x$ and related lifetable quantities from a single source, for each UK nation. 
+
+
+First, I've downloaded each of the single year files to the data directory.
+
+```{r}
+
+ons_lifetables <- tribble(
+  ~population, ~file_location,
+  "England",          "singleyearlifetablesengland1.xls",
+  "Northern Ireland", "singleyearlifetablesnorthernireland2.xls",
+  "Scotland",         "singleyearlifetablesscotland1.xls",
+  "Wales",            "singleyearlifetableswales1.xls",
+  "England & Wales",  "singleyearlifetablesenglandandwales1.xls",
+  "Great Britain"   , "singleyearlifetablesgreatbritain1.xls",
+  "United Kingdom",   "singleyearlifetablesunitedkingdom1.xls"
+)
+
+clean_data <- function(X){
+  out <- X %>% 
+  select(-junk) %>% 
+  gather(-x, key = "sex_quant", value = "value") %>% 
+  separate(sex_quant, into = c("sex", "variable")) %>% 
+  mutate(sex = case_when(sex == 'm' ~ "male", sex == 'f' ~ "female", TRUE ~ NA_character_))
+  return(out)    
+}
+
+get_mx_data <- function(path){
+  tibble(
+    year = as.character(1980:2018)
+  ) %>% 
+    mutate(dirty_data = map(
+      year, 
+      ~read_excel(
+        path = path,
+        range = "A8:L108",
+        col_names = c("x", "m_mx", "m_qx", "m_lx", "m_dx", "m_ex", "junk", "f_mx", "f_qx", "f_lx", "f_dx", "f_ex"),
+        sheet = .x
+        ))
+    ) %>% 
+    mutate(
+      tidy_data = map(dirty_data, clean_data)
+    ) %>% 
+    select(-dirty_data) %>% 
+    unnest() %>% 
+  spread(variable, value) %>% 
+  mutate(year = as.numeric(year))
+}
+
+ons_lifetables <- 
+  ons_lifetables %>% 
+    mutate(mx_data = map(file_location, ~.x %>% paste0("data/", .) %>% get_mx_data())) %>% 
+    select(-file_location) %>% 
+    unnest()
+
+ons_lifetables
+
+```
+
+From this it's very easy to extract $e_0$ alone.
+
+
+```{r}
+ons_e0 <- 
+  ons_lifetables %>% 
+    filter(x == 0) %>% 
+    select(population, year, sex, e0 = ex)
+
+ons_e0
+```
+
+
+Now to get summaries for each population and sex
+
+```{r}
+get_summary_changes <- function(data, period = c(1990, 2011)){
+  data %>% 
+    arrange(year) %>% 
+    mutate(delta_e0 = e0 - lag(e0)) %>% 
+    filter(between(year, period[1], period[2])) %>% # NOTE THE CHANGE HERE
+    summarise(
+      mean_de0 = mean(delta_e0),
+      sd_de0   = sd(delta_e0)
+    ) 
+}
+
+ons_summary_changes <- 
+  ons_e0 %>% 
+    group_by(population, sex) %>% 
+    nest() %>% 
+    mutate(summary_stats = map(data, get_summary_changes)) %>% 
+    select(-data) %>% 
+    unnest()
+
+ons_summary_changes
+
+ons_summary_changes %>% 
+  ggplot(aes(x = mean_de0, y = sd_de0, colour = sex, shape = sex)) + 
+  geom_point() +
+  scale_x_continuous(limits = c(0, 0.3)) +  
+  scale_y_continuous(limits = c(0, 0.35)) + 
+  ggrepel::geom_text_repel(aes(label = population))
+
+```
+
+
+Now to extract the 2011 value, run the simulations, and extract summary stats from the simulations 
+
+
+```{r}
+run_simulations <- function(mean, sd, k=7, m=10000, seed = 20){
+  set.seed(seed)
+  tibble(
+    draws = map2(
+      .x = mean, .y = sd, 
+      .f = ~replicate(m, rnorm(n = k, mean = .x, sd = .y))
+    )
+  ) %>% 
+  mutate(
+    draw_df = map(
+      draws,
+      ~.x %>% 
+        data.frame() %>% 
+        mutate(k = 1:n()) %>% 
+        gather(-k, key = "rep", value = "change") %>% 
+        mutate(rep = str_remove(rep, "X") %>% 
+                 as.numeric()
+        )               
+    )
+  ) %>% 
+  select(draw_df) %>% unnest()
+}
+
+
+allnations_preds <- 
+  ons_summary_changes %>% 
+    left_join(
+      ons_e0 %>% 
+        filter(year == 2011) %>% 
+        select(-year) %>% 
+        rename(e0_2011 = e0)
+    ) %>% 
+    mutate(
+      simblock = map2(.x = mean_de0, .y = sd_de0, run_simulations, m = 10000)
+    ) %>% 
+    select(population, sex, e0_2011, simblock) %>% 
+    unnest() %>% 
+    group_by(population, sex, rep) %>% 
+    arrange(k) %>% 
+    mutate(
+      cumulative_change = cumsum(change),
+      prediction = e0_2011 + cumulative_change,
+      year = k + 2011
+    ) %>% 
+    left_join(
+      ons_e0 %>% rename(e0_obs = e0), 
+      by = c("population", "year", "sex")
+    )
+
+allnations_preds  
+
+
+```
+
+
+
+```{r}
+
+allnations_preds %>% 
+  group_by(population, sex, year) %>% 
+  summarise(
+    obs = e0_obs[1],
+    mean_pred = mean(prediction),
+    med_pred  = median(prediction),
+    low_95   = quantile(prediction, 0.025),
+    high_95  = quantile(prediction, 0.975),
+    low_90   = quantile(prediction, 0.050),
+    high_90  = quantile(prediction, 0.950)
+  ) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = year)) + 
+  facet_grid(sex ~ population) + 
+  geom_ribbon(aes(ymin = low_90, ymax = high_90),
+              alpha = 0.2
+  ) + 
+  geom_ribbon(aes(ymin = low_95, ymax = high_95),
+              alpha = 0.2
+  ) + 
+  geom_line(
+    aes(y = med_pred),
+    colour = "red", size = 1.2
+  ) + 
+  geom_line(
+    aes(y = mean_pred),
+    colour = "darkgreen", size = 1.2, linetype = "dashed"
+  ) + 
+  geom_point(aes(y = obs), size = 2) +
+  labs(
+    x = "Year", y = "Life expectancy at birth in years",
+    title = "Life expectancy against 1990-2011 trend",
+    subtitle = "Red: Median of predictions; Green: Mean of predictions\nShaded regions: 90% and 95% credible intervals",
+    caption = "Source: ONS single year lifetables"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+
+ggsave("figures/allnations_ons_projections.png", height = 15, width = 25, units = "cm", dpi = 300)
+
+
+
+
+```
+
+
+Now how about 1981-2011 as calibration period?
+
+
+```{r}
+ons_summary_changes_81 <- 
+  ons_e0 %>% 
+    group_by(population, sex) %>% 
+    nest() %>% 
+    mutate(summary_stats = map(data, get_summary_changes, period = c(1981, 2011))) %>% 
+    select(-data) %>% 
+    unnest()
+
+ons_summary_changes_81
+
+ons_summary_changes
+
+```
+
+```{r}
+allnations_preds_81 <- 
+  ons_summary_changes_81 %>% 
+    left_join(
+      ons_e0 %>% 
+        filter(year == 2011) %>% 
+        select(-year) %>% 
+        rename(e0_2011 = e0)
+    ) %>% 
+    mutate(
+      simblock = map2(.x = mean_de0, .y = sd_de0, run_simulations, m = 10000)
+    ) %>% 
+    select(population, sex, e0_2011, simblock) %>% 
+    unnest() %>% 
+    group_by(population, sex, rep) %>% 
+    arrange(k) %>% 
+    mutate(
+      cumulative_change = cumsum(change),
+      prediction = e0_2011 + cumulative_change,
+      year = k + 2011
+    ) %>% 
+    left_join(
+      ons_e0 %>% rename(e0_obs = e0), 
+      by = c("population", "year", "sex")
+    )
+
+allnations_preds_81  
+
+```
+
+
+
+And visualise
+
+```{r}
+allnations_preds_81 %>% 
+  group_by(population, sex, year) %>% 
+  summarise(
+    obs = e0_obs[1],
+    mean_pred = mean(prediction),
+    med_pred  = median(prediction),
+    low_95   = quantile(prediction, 0.025),
+    high_95  = quantile(prediction, 0.975),
+    low_90   = quantile(prediction, 0.050),
+    high_90  = quantile(prediction, 0.950)
+  ) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = year)) + 
+  facet_grid(sex ~ population) + 
+  geom_ribbon(aes(ymin = low_90, ymax = high_90),
+              alpha = 0.2
+  ) + 
+  geom_ribbon(aes(ymin = low_95, ymax = high_95),
+              alpha = 0.2
+  ) + 
+  geom_line(
+    aes(y = med_pred),
+    colour = "red", size = 1.2
+  ) + 
+  geom_line(
+    aes(y = mean_pred),
+    colour = "darkgreen", size = 1.2, linetype = "dashed"
+  ) + 
+  geom_point(aes(y = obs), size = 2) +
+  labs(
+    x = "Year", y = "Life expectancy at birth in years",
+    title = "Life expectancy against 1981-2011 trend",
+    subtitle = "Red: Median of predictions; Green: Mean of predictions\nShaded regions: 90% and 95% credible intervals",
+    caption = "Source: ONS single year lifetables"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+
+ggsave("figures/allnations_ons_projections_longer.png", height = 15, width = 25, units = "cm", dpi = 300)
+
+
+
+```
+
+
+Project forward another decade
+
+
+```{r}
+
+
+allnations_next_decade_targets <- 
+  ons_summary_changes %>% 
+    left_join(
+      ons_e0 %>% 
+        filter(year == 2011) %>% 
+        select(-year) %>% 
+        rename(e0_2011 = e0)
+    ) %>% 
+    mutate(
+      simblock = map2(.x = mean_de0, .y = sd_de0, run_simulations, m = 10000, k = 17) #instead of 7 for main analysis
+    ) %>% 
+    select(population, sex, e0_2011, simblock) %>% 
+    unnest() %>% 
+    group_by(population, sex, rep) %>% 
+    arrange(k) %>% 
+    mutate(
+      cumulative_change = cumsum(change),
+      prediction = e0_2011 + cumulative_change,
+      year = k + 2011
+    ) 
+
+allnations_next_decade_targets
+
+```
+
+
+```{r}
+allnations_next_decade_targets %>% 
+  group_by(population, sex, year) %>% 
+  summarise(
+    mean_pred = mean(prediction),
+    med_pred  = median(prediction),
+    low_95   = quantile(prediction, 0.025),
+    high_95  = quantile(prediction, 0.975),
+    low_90   = quantile(prediction, 0.050),
+    high_90  = quantile(prediction, 0.950)
+  ) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = year)) + 
+  facet_grid(sex ~ population) + 
+  geom_ribbon(aes(ymin = low_90, ymax = high_90),
+              alpha = 0.2
+  ) + 
+  geom_ribbon(aes(ymin = low_95, ymax = high_95),
+              alpha = 0.2
+  ) + 
+  geom_line(
+    aes(y = med_pred),
+    colour = "red", size = 1.2
+  ) + 
+  geom_line(
+    aes(y = mean_pred),
+    colour = "darkgreen", size = 1.2, linetype = "dashed"
+  ) + 
+  labs(
+    x = "Year", y = "Life expectancy at birth in years",
+    title = "Life expectancy 10 year target against 1990-2011 trend",
+    subtitle = "Red: Median of predictions; Green: Mean of predictions\nShaded regions: 90% and 95% credible intervals",
+    caption = "Source: ONS single year lifetables"
+  ) +
+  geom_vline(xintercept = 2018, linetype = "dashed") + 
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+
+
+ggsave("figures/allnations_ons_10yeartargets.png", height = 15, width = 25, units = "cm", dpi = 300)
+
+
+
+```
+
+
+And as a table 
+
+```{r}
+allnations_next_decade_targets %>% 
+  group_by(population, sex, year) %>% 
+  summarise(
+    mean_pred = mean(prediction),
+    med_pred  = median(prediction),
+    low_95   = quantile(prediction, 0.025),
+    high_95  = quantile(prediction, 0.975),
+    low_90   = quantile(prediction, 0.050),
+    high_90  = quantile(prediction, 0.950)
+  ) %>% 
+  ungroup()
+
+```
+
+
