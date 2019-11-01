@@ -1,0 +1,99 @@
+population,sex,year,empirical_p
+England,female,2012,0.099
+England,female,2013,0.0736
+England,female,2014,0.1389
+England,female,2015,0.015
+England,female,2016,0.0187
+England,female,2017,0.0183
+England,female,2018,0.0085
+England,male,2012,0.2296
+England,male,2013,0.038
+England,male,2014,0.0523
+England,male,2015,0.0016
+England,male,2016,0.0015
+England,male,2017,5e-4
+England,male,2018,0
+England & Wales,female,2012,0.0937
+England & Wales,female,2013,0.0723
+England & Wales,female,2014,0.1433
+England & Wales,female,2015,0.0147
+England & Wales,female,2016,0.0201
+England & Wales,female,2017,0.0186
+England & Wales,female,2018,0.0085
+England & Wales,male,2012,0.2329
+England & Wales,male,2013,0.0365
+England & Wales,male,2014,0.0587
+England & Wales,male,2015,0.0019
+England & Wales,male,2016,0.0015
+England & Wales,male,2017,5e-4
+England & Wales,male,2018,0
+Great Britain,female,2012,0.0967
+Great Britain,female,2013,0.087
+Great Britain,female,2014,0.1592
+Great Britain,female,2015,0.0178
+Great Britain,female,2016,0.0229
+Great Britain,female,2017,0.021
+Great Britain,female,2018,0.0098
+Great Britain,male,2012,0.2601
+Great Britain,male,2013,0.0523
+Great Britain,male,2014,0.087
+Great Britain,male,2015,0.003
+Great Britain,male,2016,0.0023
+Great Britain,male,2017,0.0012
+Great Britain,male,2018,1e-4
+Northern Ireland,female,2012,0.1504
+Northern Ireland,female,2013,0.102
+Northern Ireland,female,2014,0.132
+Northern Ireland,female,2015,0.0636
+Northern Ireland,female,2016,0.0584
+Northern Ireland,female,2017,0.0675
+Northern Ireland,female,2018,0.0517
+Northern Ireland,male,2012,0.3829
+Northern Ireland,male,2013,0.194
+Northern Ireland,male,2014,0.4396
+Northern Ireland,male,2015,0.0737
+Northern Ireland,male,2016,0.2115
+Northern Ireland,male,2017,0.0469
+Northern Ireland,male,2018,0.0947
+Scotland,female,2012,0.1804
+Scotland,female,2013,0.2807
+Scotland,female,2014,0.3954
+Scotland,female,2015,0.0979
+Scotland,female,2016,0.0787
+Scotland,female,2017,0.065
+Scotland,female,2018,0.0264
+Scotland,male,2012,0.5323
+Scotland,male,2013,0.4821
+Scotland,male,2014,0.5178
+Scotland,male,2015,0.1043
+Scotland,male,2016,0.0597
+Scotland,male,2017,0.0571
+Scotland,male,2018,0.0244
+United Kingdom,female,2012,0.0961
+United Kingdom,female,2013,0.081
+United Kingdom,female,2014,0.1505
+United Kingdom,female,2015,0.0174
+United Kingdom,female,2016,0.0224
+United Kingdom,female,2017,0.0205
+United Kingdom,female,2018,0.0094
+United Kingdom,male,2012,0.2596
+United Kingdom,male,2013,0.0554
+United Kingdom,male,2014,0.092
+United Kingdom,male,2015,0.003
+United Kingdom,male,2016,0.0026
+United Kingdom,male,2017,0.001
+United Kingdom,male,2018,1e-4
+Wales,female,2012,0.0645
+Wales,female,2013,0.0697
+Wales,female,2014,0.2596
+Wales,female,2015,0.0304
+Wales,female,2016,0.0832
+Wales,female,2017,0.0552
+Wales,female,2018,0.0235
+Wales,male,2012,0.3561
+Wales,male,2013,0.1661
+Wales,male,2014,0.4577
+Wales,male,2015,0.0944
+Wales,male,2016,0.059
+Wales,male,2017,0.0698
+Wales,male,2018,0.0279

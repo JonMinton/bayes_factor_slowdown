@@ -1186,3 +1186,31 @@ allnations_next_decade_targets %>%
 ```
 
 
+Now for predicted/observed comparisons 
+
+```{r}
+save_the_table <- function(x, path){
+  write_csv(x, path)
+  x
+}
+
+allnations_preds %>% 
+  group_by(population, sex, year) %>% 
+  summarise(empirical_p = mean(prediction < e0_obs)) %>% 
+  ungroup() %>%
+  save_the_table("data/empirical_p_allnations1990_2011.csv") %>% 
+  ggplot(aes(x = year, y = empirical_p, colour = sex, group = sex, shape = sex)) + 
+  geom_line() + geom_point() +
+  facet_wrap(~population) +
+  labs(
+    x = "Year", y = "Share of projected values worse than observed",
+    title = "Share of projected values worse than observed, based on trends from 1990-2011",
+    caption = "Source: ONS single year lifetables"
+  )
+
+
+ggsave("figures/allnations_projected_observed.png",height = 15, width = 20, units = "cm", dpi = 300)
+
+
+
+```
