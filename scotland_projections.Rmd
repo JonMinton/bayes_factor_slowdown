@@ -842,6 +842,8 @@ ons_e0 <-
     select(population, year, sex, e0 = ex)
 
 ons_e0
+
+write_csv(ons_e0, "data/e0_from_ons_allnations.csv")
 ```
 
 

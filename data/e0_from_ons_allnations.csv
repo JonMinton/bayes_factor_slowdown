@@ -1,0 +1,547 @@
+population,year,sex,e0
+England,1980,female,76.81
+England,1980,male,70.8
+England,1981,female,77.11
+England,1981,male,71.13
+England,1982,female,77.2
+England,1982,male,71.29
+England,1983,female,77.45
+England,1983,male,71.54
+England,1984,female,77.79
+England,1984,male,71.95
+England,1985,female,77.59
+England,1985,male,71.87
+England,1986,female,77.88
+England,1986,male,72.09
+England,1987,female,78.17
+England,1987,male,72.48
+England,1988,female,78.25
+England,1988,male,72.6
+England,1989,female,78.35
+England,1989,male,72.85
+England,1990,female,78.7
+England,1990,male,73.08
+England,1991,female,78.78
+England,1991,male,73.29
+England,1992,female,79.15
+England,1992,male,73.74
+England,1993,female,79.01
+England,1993,male,73.73
+England,1994,female,79.53
+England,1994,male,74.3
+England,1995,female,79.45
+England,1995,male,74.25
+England,1996,female,79.56
+England,1996,male,74.48
+England,1997,female,79.72
+England,1997,male,74.78
+England,1998,female,79.94
+England,1998,male,74.97
+England,1999,female,80.03
+England,1999,male,75.24
+England,2000,female,80.37
+England,2000,male,75.64
+England,2001,female,80.6
+England,2001,male,75.95
+England,2002,female,80.73
+England,2002,male,76.11
+England,2003,female,80.7
+England,2003,male,76.34
+England,2004,female,81.26
+England,2004,male,76.88
+England,2005,female,81.42
+England,2005,male,77.14
+England,2006,female,81.72
+England,2006,male,77.46
+England,2007,female,81.89
+England,2007,male,77.75
+England,2008,female,81.94
+England,2008,male,77.89
+England,2009,female,82.47
+England,2009,male,78.35
+England,2010,female,82.59
+England,2010,male,78.68
+England,2011,female,82.96
+England,2011,male,79.09
+England,2012,female,82.92
+England,2012,male,79.26
+England,2013,female,82.99
+England,2013,male,79.27
+England,2014,female,83.23
+England,2014,male,79.51
+England,2015,female,82.96
+England,2015,male,79.34
+England,2016,female,83.11
+England,2016,male,79.52
+England,2017,female,83.23
+England,2017,male,79.59
+England,2018,female,83.2
+England,2018,male,79.55
+Northern Ireland,1980,female,74.97
+Northern Ireland,1980,male,68.25
+Northern Ireland,1981,female,75.89
+Northern Ireland,1981,male,69.28
+Northern Ireland,1982,female,75.71
+Northern Ireland,1982,male,69.99
+Northern Ireland,1983,female,76.39
+Northern Ireland,1983,male,69.95
+Northern Ireland,1984,female,76.86
+Northern Ireland,1984,male,70.46
+Northern Ireland,1985,female,76.79
+Northern Ireland,1985,male,70.55
+Northern Ireland,1986,female,77.02
+Northern Ireland,1986,male,70.7
+Northern Ireland,1987,female,77.55
+Northern Ireland,1987,male,71.46
+Northern Ireland,1988,female,77.27
+Northern Ireland,1988,male,71.26
+Northern Ireland,1989,female,77.74
+Northern Ireland,1989,male,71.74
+Northern Ireland,1990,female,77.88
+Northern Ireland,1990,male,72.19
+Northern Ireland,1991,female,78.43
+Northern Ireland,1991,male,72.48
+Northern Ireland,1992,female,78.89
+Northern Ireland,1992,male,72.99
+Northern Ireland,1993,female,78.37
+Northern Ireland,1993,male,72.73
+Northern Ireland,1994,female,78.81
+Northern Ireland,1994,male,73.29
+Northern Ireland,1995,female,78.75
+Northern Ireland,1995,male,73.31
+Northern Ireland,1996,female,79.24
+Northern Ireland,1996,male,73.92
+Northern Ireland,1997,female,79.48
+Northern Ireland,1997,male,74.24
+Northern Ireland,1998,female,79.72
+Northern Ireland,1998,male,74.33
+Northern Ireland,1999,female,79.17
+Northern Ireland,1999,male,74.24
+Northern Ireland,2000,female,79.77
+Northern Ireland,2000,male,74.86
+Northern Ireland,2001,female,80.33
+Northern Ireland,2001,male,75.27
+Northern Ireland,2002,female,80.29
+Northern Ireland,2002,male,75.44
+Northern Ireland,2003,female,80.63
+Northern Ireland,2003,male,75.93
+Northern Ireland,2004,female,80.71
+Northern Ireland,2004,male,76.06
+Northern Ireland,2005,female,81.12
+Northern Ireland,2005,male,75.98
+Northern Ireland,2006,female,81.06
+Northern Ireland,2006,male,76.19
+Northern Ireland,2007,female,81.38
+Northern Ireland,2007,male,76.25
+Northern Ireland,2008,female,81.18
+Northern Ireland,2008,male,76.54
+Northern Ireland,2009,female,81.41
+Northern Ireland,2009,male,77.2
+Northern Ireland,2010,female,81.71
+Northern Ireland,2010,male,77.16
+Northern Ireland,2011,female,82.4
+Northern Ireland,2011,male,77.85
+Northern Ireland,2012,female,82.26
+Northern Ireland,2012,male,78.05
+Northern Ireland,2013,female,82.22
+Northern Ireland,2013,male,78.07
+Northern Ireland,2014,female,82.38
+Northern Ireland,2014,male,78.61
+Northern Ireland,2015,female,82.22
+Northern Ireland,2015,male,78.17
+Northern Ireland,2016,female,82.27
+Northern Ireland,2016,male,78.75
+Northern Ireland,2017,female,82.43
+Northern Ireland,2017,male,78.38
+Northern Ireland,2018,female,82.44
+Northern Ireland,2018,male,78.84
+Scotland,1980,female,75.21
+Scotland,1980,male,68.97
+Scotland,1981,female,75.44
+Scotland,1981,male,69.12
+Scotland,1982,female,75.26
+Scotland,1982,male,69.24
+Scotland,1983,female,75.7
+Scotland,1983,male,69.64
+Scotland,1984,female,75.91
+Scotland,1984,male,69.9
+Scotland,1985,female,75.84
+Scotland,1985,male,70.06
+Scotland,1986,female,76.25
+Scotland,1986,male,70.08
+Scotland,1987,female,76.53
+Scotland,1987,male,70.49
+Scotland,1988,female,76.7
+Scotland,1988,male,70.48
+Scotland,1989,female,76.17
+Scotland,1989,male,70.66
+Scotland,1990,female,76.92
+Scotland,1990,male,71.13
+Scotland,1991,female,77.13
+Scotland,1991,male,71.4
+Scotland,1992,female,77.27
+Scotland,1992,male,71.6
+Scotland,1993,female,76.96
+Scotland,1993,male,71.4
+Scotland,1994,female,77.7
+Scotland,1994,male,72.11
+Scotland,1995,female,77.67
+Scotland,1995,male,72.12
+Scotland,1996,female,77.8
+Scotland,1996,male,72.01
+Scotland,1997,female,78.08
+Scotland,1997,male,72.56
+Scotland,1998,female,78.21
+Scotland,1998,male,72.64
+Scotland,1999,female,78.23
+Scotland,1999,male,72.71
+Scotland,2000,female,78.63
+Scotland,2000,male,73.18
+Scotland,2001,female,78.83
+Scotland,2001,male,73.4
+Scotland,2002,female,78.89
+Scotland,2002,male,73.35
+Scotland,2003,female,78.88
+Scotland,2003,male,73.75
+Scotland,2004,female,79.41
+Scotland,2004,male,74.26
+Scotland,2005,female,79.47
+Scotland,2005,male,74.69
+Scotland,2006,female,79.77
+Scotland,2006,male,74.83
+Scotland,2007,female,79.81
+Scotland,2007,male,74.86
+Scotland,2008,female,79.93
+Scotland,2008,male,75.28
+Scotland,2009,female,80.41
+Scotland,2009,male,75.9
+Scotland,2010,female,80.61
+Scotland,2010,male,76.21
+Scotland,2011,female,80.82
+Scotland,2011,male,76.5
+Scotland,2012,female,80.8
+Scotland,2012,male,76.79
+Scotland,2013,female,81.04
+Scotland,2013,male,77.02
+Scotland,2014,female,81.34
+Scotland,2014,male,77.32
+Scotland,2015,female,81.03
+Scotland,2015,male,76.95
+Scotland,2016,female,81.08
+Scotland,2016,male,76.96
+Scotland,2017,female,81.16
+Scotland,2017,male,77.13
+Scotland,2018,female,81.01
+Scotland,2018,male,77.05
+Wales,1980,female,76.35
+Wales,1980,male,70.29
+Wales,1981,female,76.34
+Wales,1981,male,70.44
+Wales,1982,female,76.57
+Wales,1982,male,70.8
+Wales,1983,female,76.76
+Wales,1983,male,70.81
+Wales,1984,female,77.52
+Wales,1984,male,71.55
+Wales,1985,female,77.14
+Wales,1985,male,71.18
+Wales,1986,female,77.58
+Wales,1986,male,71.49
+Wales,1987,female,77.88
+Wales,1987,male,71.97
+Wales,1988,female,78.19
+Wales,1988,male,72.47
+Wales,1989,female,77.95
+Wales,1989,male,72.52
+Wales,1990,female,78.67
+Wales,1990,male,72.76
+Wales,1991,female,78.75
+Wales,1991,male,73.11
+Wales,1992,female,78.92
+Wales,1992,male,73.48
+Wales,1993,female,78.66
+Wales,1993,male,73.13
+Wales,1994,female,79.23
+Wales,1994,male,73.68
+Wales,1995,female,78.92
+Wales,1995,male,73.45
+Wales,1996,female,79.05
+Wales,1996,male,73.95
+Wales,1997,female,79.17
+Wales,1997,male,74.03
+Wales,1998,female,79.49
+Wales,1998,male,74.59
+Wales,1999,female,79.33
+Wales,1999,male,74.27
+Wales,2000,female,79.91
+Wales,2000,male,74.89
+Wales,2001,female,79.97
+Wales,2001,male,75.29
+Wales,2002,female,80.16
+Wales,2002,male,75.6
+Wales,2003,female,80.21
+Wales,2003,male,75.51
+Wales,2004,female,80.61
+Wales,2004,male,76.22
+Wales,2005,female,80.87
+Wales,2005,male,76.58
+Wales,2006,female,81.3
+Wales,2006,male,76.87
+Wales,2007,female,81.08
+Wales,2007,male,76.57
+Wales,2008,female,81.29
+Wales,2008,male,77.15
+Wales,2009,female,81.84
+Wales,2009,male,77.5
+Wales,2010,female,81.85
+Wales,2010,male,77.88
+Wales,2011,female,82.33
+Wales,2011,male,78.09
+Wales,2012,female,82.09
+Wales,2012,male,78.23
+Wales,2013,female,82.13
+Wales,2013,male,78.16
+Wales,2014,female,82.61
+Wales,2014,male,78.79
+Wales,2015,female,82.03
+Wales,2015,male,78.27
+Wales,2016,female,82.42
+Wales,2016,male,78.23
+Wales,2017,female,82.39
+Wales,2017,male,78.45
+Wales,2018,female,82.19
+Wales,2018,male,78.23
+England & Wales,1980,female,76.78
+England & Wales,1980,male,70.77
+England & Wales,1981,female,77.07
+England & Wales,1981,male,71.09
+England & Wales,1982,female,77.16
+England & Wales,1982,male,71.26
+England & Wales,1983,female,77.41
+England & Wales,1983,male,71.5
+England & Wales,1984,female,77.77
+England & Wales,1984,male,71.92
+England & Wales,1985,female,77.56
+England & Wales,1985,male,71.83
+England & Wales,1986,female,77.86
+England & Wales,1986,male,72.05
+England & Wales,1987,female,78.15
+England & Wales,1987,male,72.45
+England & Wales,1988,female,78.24
+England & Wales,1988,male,72.59
+England & Wales,1989,female,78.32
+England & Wales,1989,male,72.83
+England & Wales,1990,female,78.7
+England & Wales,1990,male,73.06
+England & Wales,1991,female,78.77
+England & Wales,1991,male,73.28
+England & Wales,1992,female,79.14
+England & Wales,1992,male,73.73
+England & Wales,1993,female,78.99
+England & Wales,1993,male,73.7
+England & Wales,1994,female,79.51
+England & Wales,1994,male,74.26
+England & Wales,1995,female,79.42
+England & Wales,1995,male,74.2
+England & Wales,1996,female,79.53
+England & Wales,1996,male,74.45
+England & Wales,1997,female,79.69
+England & Wales,1997,male,74.74
+England & Wales,1998,female,79.91
+England & Wales,1998,male,74.95
+England & Wales,1999,female,79.99
+England & Wales,1999,male,75.18
+England & Wales,2000,female,80.35
+England & Wales,2000,male,75.59
+England & Wales,2001,female,80.56
+England & Wales,2001,male,75.91
+England & Wales,2002,female,80.69
+England & Wales,2002,male,76.08
+England & Wales,2003,female,80.67
+England & Wales,2003,male,76.29
+England & Wales,2004,female,81.22
+England & Wales,2004,male,76.84
+England & Wales,2005,female,81.39
+England & Wales,2005,male,77.11
+England & Wales,2006,female,81.7
+England & Wales,2006,male,77.43
+England & Wales,2007,female,81.84
+England & Wales,2007,male,77.68
+England & Wales,2008,female,81.9
+England & Wales,2008,male,77.85
+England & Wales,2009,female,82.43
+England & Wales,2009,male,78.3
+England & Wales,2010,female,82.55
+England & Wales,2010,male,78.63
+England & Wales,2011,female,82.92
+England & Wales,2011,male,79.03
+England & Wales,2012,female,82.87
+England & Wales,2012,male,79.2
+England & Wales,2013,female,82.94
+England & Wales,2013,male,79.2
+England & Wales,2014,female,83.19
+England & Wales,2014,male,79.46
+England & Wales,2015,female,82.9
+England & Wales,2015,male,79.28
+England & Wales,2016,female,83.07
+England & Wales,2016,male,79.44
+England & Wales,2017,female,83.18
+England & Wales,2017,male,79.52
+England & Wales,2018,female,83.14
+England & Wales,2018,male,79.47
+Great Britain,1980,female,76.63
+Great Britain,1980,male,70.6
+Great Britain,1981,female,76.91
+Great Britain,1981,male,70.9
+Great Britain,1982,female,76.98
+Great Britain,1982,male,71.07
+Great Britain,1983,female,77.24
+Great Britain,1983,male,71.32
+Great Britain,1984,female,77.59
+Great Britain,1984,male,71.73
+Great Britain,1985,female,77.39
+Great Britain,1985,male,71.67
+Great Britain,1986,female,77.71
+Great Britain,1986,male,71.87
+Great Britain,1987,female,77.99
+Great Britain,1987,male,72.27
+Great Britain,1988,female,78.09
+Great Britain,1988,male,72.39
+Great Britain,1989,female,78.11
+Great Britain,1989,male,72.63
+Great Britain,1990,female,78.53
+Great Britain,1990,male,72.88
+Great Britain,1991,female,78.62
+Great Britain,1991,male,73.1
+Great Britain,1992,female,78.96
+Great Britain,1992,male,73.53
+Great Britain,1993,female,78.79
+Great Britain,1993,male,73.48
+Great Britain,1994,female,79.34
+Great Britain,1994,male,74.06
+Great Britain,1995,female,79.25
+Great Britain,1995,male,74.01
+Great Britain,1996,female,79.36
+Great Britain,1996,male,74.22
+Great Britain,1997,female,79.53
+Great Britain,1997,male,74.53
+Great Britain,1998,female,79.75
+Great Britain,1998,male,74.74
+Great Britain,1999,female,79.82
+Great Britain,1999,male,74.95
+Great Britain,2000,female,80.18
+Great Britain,2000,male,75.37
+Great Britain,2001,female,80.4
+Great Britain,2001,male,75.68
+Great Britain,2002,female,80.52
+Great Britain,2002,male,75.83
+Great Britain,2003,female,80.5
+Great Britain,2003,male,76.06
+Great Britain,2004,female,81.05
+Great Britain,2004,male,76.61
+Great Britain,2005,female,81.21
+Great Britain,2005,male,76.89
+Great Britain,2006,female,81.51
+Great Britain,2006,male,77.19
+Great Britain,2007,female,81.64
+Great Britain,2007,male,77.42
+Great Britain,2008,female,81.71
+Great Britain,2008,male,77.61
+Great Britain,2009,female,82.23
+Great Britain,2009,male,78.08
+Great Britain,2010,female,82.36
+Great Britain,2010,male,78.41
+Great Britain,2011,female,82.72
+Great Britain,2011,male,78.8
+Great Britain,2012,female,82.67
+Great Britain,2012,male,78.98
+Great Britain,2013,female,82.76
+Great Britain,2013,male,79
+Great Britain,2014,female,83.01
+Great Britain,2014,male,79.27
+Great Britain,2015,female,82.72
+Great Britain,2015,male,79.07
+Great Britain,2016,female,82.88
+Great Britain,2016,male,79.22
+Great Britain,2017,female,82.99
+Great Britain,2017,male,79.31
+Great Britain,2018,female,82.94
+Great Britain,2018,male,79.25
+United Kingdom,1980,female,76.59
+United Kingdom,1980,male,70.54
+United Kingdom,1981,female,76.88
+United Kingdom,1981,male,70.86
+United Kingdom,1982,female,76.94
+United Kingdom,1982,male,71.04
+United Kingdom,1983,female,77.22
+United Kingdom,1983,male,71.28
+United Kingdom,1984,female,77.57
+United Kingdom,1984,male,71.7
+United Kingdom,1985,female,77.38
+United Kingdom,1985,male,71.64
+United Kingdom,1986,female,77.69
+United Kingdom,1986,male,71.84
+United Kingdom,1987,female,77.98
+United Kingdom,1987,male,72.25
+United Kingdom,1988,female,78.07
+United Kingdom,1988,male,72.36
+United Kingdom,1989,female,78.1
+United Kingdom,1989,male,72.61
+United Kingdom,1990,female,78.51
+United Kingdom,1990,male,72.86
+United Kingdom,1991,female,78.61
+United Kingdom,1991,male,73.09
+United Kingdom,1992,female,78.96
+United Kingdom,1992,male,73.51
+United Kingdom,1993,female,78.78
+United Kingdom,1993,male,73.46
+United Kingdom,1994,female,79.32
+United Kingdom,1994,male,74.04
+United Kingdom,1995,female,79.24
+United Kingdom,1995,male,73.99
+United Kingdom,1996,female,79.36
+United Kingdom,1996,male,74.21
+United Kingdom,1997,female,79.53
+United Kingdom,1997,male,74.52
+United Kingdom,1998,female,79.75
+United Kingdom,1998,male,74.73
+United Kingdom,1999,female,79.8
+United Kingdom,1999,male,74.93
+United Kingdom,2000,female,80.17
+United Kingdom,2000,male,75.36
+United Kingdom,2001,female,80.4
+United Kingdom,2001,male,75.67
+United Kingdom,2002,female,80.51
+United Kingdom,2002,male,75.82
+United Kingdom,2003,female,80.5
+United Kingdom,2003,male,76.06
+United Kingdom,2004,female,81.04
+United Kingdom,2004,male,76.59
+United Kingdom,2005,female,81.2
+United Kingdom,2005,male,76.86
+United Kingdom,2006,female,81.5
+United Kingdom,2006,male,77.16
+United Kingdom,2007,female,81.63
+United Kingdom,2007,male,77.39
+United Kingdom,2008,female,81.69
+United Kingdom,2008,male,77.58
+United Kingdom,2009,female,82.21
+United Kingdom,2009,male,78.06
+United Kingdom,2010,female,82.34
+United Kingdom,2010,male,78.38
+United Kingdom,2011,female,82.71
+United Kingdom,2011,male,78.77
+United Kingdom,2012,female,82.66
+United Kingdom,2012,male,78.95
+United Kingdom,2013,female,82.74
+United Kingdom,2013,male,78.98
+United Kingdom,2014,female,82.99
+United Kingdom,2014,male,79.25
+United Kingdom,2015,female,82.71
+United Kingdom,2015,male,79.04
+United Kingdom,2016,female,82.87
+United Kingdom,2016,male,79.21
+United Kingdom,2017,female,82.98
+United Kingdom,2017,male,79.28
+United Kingdom,2018,female,82.93
+United Kingdom,2018,male,79.24
