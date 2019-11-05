@@ -8,3 +8,10 @@ This repository contains analysis of publically available mortality data on two 
 This statement needs to be reviewed and accepted
 
 Here is a link to an intro to [markdown](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet)
+
+## Figures 
+
+Here is a figure from within the repo
+
+![Can this be read?](figures/allnations_projected_observed.png)
+
