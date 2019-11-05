@@ -6,3 +6,5 @@ This repository contains analysis of publically available mortality data on two 
 * Estimates of the likelihood there's been a slowdown in life expectancy from 2012 onwards given recent observations and past trends, and the relatively likelihood of different proposed magnitudes of decline
 
 This statement needs to be reviewed and accepted
+
+Here is a link to an intro to [markdown](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet)
