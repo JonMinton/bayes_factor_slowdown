@@ -49,10 +49,20 @@ As for each sex and number of discrete projection periods $K$ (from 1 to 7 perio
 Load packages required
 
 ```{r}
-pacman::p_load(HMDHFDplus, tidyverse, broom, readxl)
+pacman::p_load(HMDHFDplus, tidyverse, broom, readxl, here)
 
 ```
 
+
+Bespoke function 
+
+```{r}
+save_the_table <- function(x, path){
+  write_csv(x, path)
+  x
+}
+
+```
 # Data
 
 The data used are described below. The code will not be run/evaluated as the data have already been downloaded.
@@ -241,7 +251,7 @@ ten_k_runs <-
       )
   ) %>% 
   select(sex, draw_df) %>% 
-  unnest()
+  unnest(cols = c(draw_df))
 
 
 # a 1% sample 
@@ -446,7 +456,7 @@ ten_k_runs <-
     )
   ) %>% 
   select(sex, draw_df) %>% 
-  unnest()
+  unnest(cols = c(draw_df))
 
 ```
 
@@ -884,7 +894,7 @@ ons_summary_changes %>%
 Now to extract the 2011 value, run the simulations, and extract summary stats from the simulations 
 
 
-```{r}
+```{r, cache = TRUE}
 run_simulations <- function(mean, sd, k=7, m=10000, seed = 20){
   set.seed(seed)
   tibble(
@@ -955,6 +965,7 @@ allnations_preds %>%
     high_90  = quantile(prediction, 0.950)
   ) %>% 
   ungroup() %>% 
+  save_the_table(here("data", "preds_using_ons_from_1990.csv")) %>% 
   ggplot(aes(x = year)) + 
   facet_grid(sex ~ population) + 
   geom_ribbon(aes(ymin = low_90, ymax = high_90),
@@ -1008,7 +1019,9 @@ ons_summary_changes
 
 ```
 
-```{r}
+
+
+```{r, cache = TRUE}
 allnations_preds_81 <- 
   ons_summary_changes_81 %>% 
     left_join(
@@ -1043,6 +1056,7 @@ allnations_preds_81
 And visualise
 
 ```{r}
+
 allnations_preds_81 %>% 
   group_by(population, sex, year) %>% 
   summarise(
@@ -1055,6 +1069,7 @@ allnations_preds_81 %>%
     high_90  = quantile(prediction, 0.950)
   ) %>% 
   ungroup() %>% 
+  save_the_table(here("data", "preds_from_1981.csv")) %>% 
   ggplot(aes(x = year)) + 
   facet_grid(sex ~ population) + 
   geom_ribbon(aes(ymin = low_90, ymax = high_90),
@@ -1191,10 +1206,6 @@ allnations_next_decade_targets %>%
 Now for predicted/observed comparisons 
 
 ```{r}
-save_the_table <- function(x, path){
-  write_csv(x, path)
-  x
-}
 
 allnations_preds %>% 
   group_by(population, sex, year) %>% 
