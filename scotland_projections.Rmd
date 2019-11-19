@@ -21,7 +21,7 @@ Two periods will be considered when informing the pre-2012 trends:
 
 [Lee (2016?)](https://link.springer.com/chapter/10.1007%2F978-3-030-05075-7_14), who co-created the [Lee-Carter model](https://www.jstor.org/stable/2290201?seq=1#page_scan_tab_contents) for mortality projection in the early 1990s, accepted in the mid/late 2000s, as a result of analyses by [White (2002)](https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1728-4457.2002.00059.x) and [Oeppen & Vaupel (2002)](http://truemedmd.com/wp-content/uploads/2013/07/Life_expectancy_scienceMay2002.pdf), that a much simpler modelling approach is often adequate for life expectancy forecasting. This approach involves modelling life expectancy at birth ($e_0$) directly, rather than individual age specific mortality rates ($m_{x}$) and quantities derived from them (a 'drift parameter' $k$) as in Lee-Carter's original model specification. 
 
-Although [Lee (2002)](https://link.springer.com/chapter/10.1007%2F978-3-030-05075-7_14) presents a number of refinements of a basic linear life expectancy forecase model specification, including models which allow for negative autocorrelation between change in years, the article states that the basic strategy for forecasting should be "to use the appropriate or preferred equation for $de_{t}/dt$ [change in life expectancy] to estimate $e0$ one year later, and then continue recursively." This is the approach this projection exercise will follow
+Although [Lee (2002)](https://link.springer.com/chapter/10.1007%2F978-3-030-05075-7_14) presents a number of refinements of a basic linear life expectancy forecase model specification, including models which allow for negative autocorrelation between change in years, the article states that the basic strategy for forecasting should be "to use the appropriate or preferred equation for $de_{t}/dt$ [change in life expectancy] to estimate $e0$ one year later, and then continue recursively." This is the approach this projection exercise will follow.
 
 ## Modelling strategy
 
@@ -49,14 +49,14 @@ As for each sex and number of discrete projection periods $K$ (from 1 to 7 perio
 Load packages required
 
 ```{r}
-pacman::p_load(HMDHFDplus, tidyverse, broom, readxl, here)
+pacman::p_load(HMDHFDplus, tidyverse, broom, readxl, here, svglite)
 
 ```
 
 
 Bespoke function 
 
-```{r}
+```{r fn_save_the_table}
 save_the_table <- function(x, path){
   write_csv(x, path)
   x
@@ -65,723 +65,7 @@ save_the_table <- function(x, path){
 ```
 # Data
 
-The data used are described below. The code will not be run/evaluated as the data have already been downloaded.
-
-```{r, eval = FALSE}
-# Single year life tables for Scotland available here:
-
-# https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/singleyearlifetablesuk1980to2018
-
-# Downloaded to data folder (see singleyearlifetablesscland.xls)
-
-# load e0 for scotland
-# dta_scot <- HMDHFDplus::readHMDweb("GBR_SCO", item = "E0per", username = userInput(), password = userInput())
-# dta_scot
-
-# load mx for scotland
-# dta_scot_mx <- HMDHFDplus::readHMDweb("GBR_SCO", item = "Mx_1x1", username = userInput(), password = userInput())
-# HMDHFDplus::getHMDitemavail("GBR_SCO", username = userInput(), password = userInput())
-
-# bring to tidy format
-# dta_scot_tidy <- 
-#   dta_scot %>% 
-#     as_tibble() %>% 
-#     rename_all(tolower) %>% 
-#     gather(-year, key = "sex", value = "e0")
-
-# write e0 to directory
-# write_csv(dta_scot_tidy, "data/e0_scot.csv")
-```
-
-The data will now be loaded locally, and augmented with the last couple of years' e0
-
-```{r}
-dta_scot_tidy <- read_csv("data/e0_scot.csv")
-# manually adding last two years from table listed above
-dta_scot_tidy <- 
-  dta_scot_tidy %>% 
-    bind_rows(
-      tribble(
-        ~year, ~sex, ~e0,
-        2017, "male", 77.13,
-        2017, "female", 81.16,
-        2018, "male", 77.05,
-        2018, "female", 81.01
-      )
-    )
-# n.b. does not include total
-```
-
-# Visualise e0 at birth
-
-The following chunk shows life expectancy at birth over all available years 
-
-```{r}
-dta_scot_tidy %>% 
-  ggplot(aes(x = year, y = e0, group = sex, colour = sex)) + 
-  geom_line() + 
-  labs(
-    x = "Year", 
-    y = "Life expectancy at birth", 
-    title = "Life expectancy at birth by year in Scotland", 
-    caption = "Source: HMD"
-  )
-
-ggsave("figures/scot_e0.png", height = 15, width = 25, dpi = 300, units = "cm")
-```
-
-Another, less familiar, way of visualising this data is in annual changes in e0. This will be more useful for informing our model
-
-
-```{r}
-dta_scot_tidy %>% 
-  group_by(sex) %>% 
-  arrange(year) %>% 
-  mutate(delta_e0 = e0 - lag(e0)) %>%
-  ungroup () %>% 
-  ggplot(aes(x = year, y = delta_e0, group = sex, colour = sex, shape = sex)) + 
-  geom_point() + geom_line() +
-  labs(
-    x = "Year", y = "Change in life expectancy from last year", 
-    title = "Annual change in life expectancy in Scotland"
-  ) + 
-  geom_hline(yintercept = 0) +
-  geom_vline(xintercept = 2012, linetype = "dashed")
-
-ggsave("figures/scot_e0_annual_change.png", height = 15, width= 25, dpi = 300, units = "cm")
-```
-
-
-The reason for not using data from before 1950 is clear from this. Before 1950 there was much more variation in life expectancy than there has been since. 
-
-Let's look at the trend and life expectancy from 1950 onwards 
-
-```{r}
-dta_scot_tidy %>% 
-  group_by(sex) %>% 
-  arrange(year) %>% 
-  mutate(delta_e0 = e0 - lag(e0)) %>%
-  ungroup() %>% 
-  filter(year >= 1950) %>% 
-  ggplot(aes(x = year, y = delta_e0, group = sex, colour = sex, shape = sex)) + 
-  geom_point() + geom_line() +
-  labs(
-    x = "Year", y = "Change in life expectancy from last year", 
-    title = "Annual change in life expectancy in Scotland"
-  ) + 
-  geom_hline(yintercept = 0) +
-  geom_vline(xintercept = 2012, linetype = "dashed")
-
-ggsave("figures/scot_e0_annual_change_since_1950.png", height = 15, width = 25, dpi = 300, units = "cm")
-```
-
-We can see there are similar, but not identical, patterns observed for both sexes. Previous research has demonstrated one year negative autocorrelation in the series, i.e. that 'good' years tend to precede 'bad' years and vice versa. [White (2002)](https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1728-4457.2002.00059.x) noted that, for changes in life expectancy in high income countries as a whole, there was a "small but significant negative relationship between change in average life expectancy in one year and change in the next", and that:
-
-> The negative relationship between change in $e_0$ from one year to the next may represent a tendency for misestimates or random shocks to life expectancy to be corrected in the subsequent year. For example, a particularly virulant flu epidemic might cause a low rise in life expectancy that year. But if deaths are raised or overestimated in one year, a return to normal levels in the next would tend to cause a low rise in life expectancy to be followed by a high one.
-
-[Lee (2016?)](https://link.springer.com/chapter/10.1007%2F978-3-030-05075-7_14) also suggested incoroporating 1 year lagged autocorrelation terms into population projections. This is something we could do but I don't think will be necessary for our purposes. 
-
-The code below (not evaluated) tidies/arranges mortality risks by indivdiual ages and saves into a tidied file available locally
-  
-```{r, eval = FALSE}
-# move mx to tidy format
-mx_scot_tidy <-
-  dta_scot_mx %>%
-    as_tibble() %>%
-    rename_all(tolower) %>%
-    select(-openinterval) %>%
-    gather(-year, -age, key ="sex", value = "mx")
-
-# write mx to directory
-write_csv(mx_scot_tidy, "data/mx_scot.csv")
-```
-
-## Projecting based on $P_1$ (1950-2011)
-
-The followign code calculates the average improvement rate and variation in improvement rates over the period 1950-2011
-
-```{r}
-e0_ch_summary <- 
-  dta_scot_tidy %>% 
-    group_by(sex) %>% 
-    arrange(year) %>% 
-    mutate(delta_e0 = e0 - lag(e0)) %>% 
-    ungroup() %>% 
-    filter(between(year, 1950, 2011)) %>% 
-    group_by(sex) %>% 
-    summarise(
-      mean_de0 = mean(delta_e0),
-      sd_de0   = sd(delta_e0)
-    ) %>% 
-    ungroup()
-
-e0_ch_summary_p1 <- e0_ch_summary
-
-e0_ch_summary
-
-
-```
-
-On average, between 1950 and 2011, mortality rates increased by around two years per decade, but with a standard deviation around 50% larger than this average. This highlights why it is important to incorporate measures of variation in life expectancy projections, and also why it can be tricky to identify a change in trend based on a small number of observations.
-
-The code below creates the 10,000 simulations, each projecting forward seven periods (from 2012-2018 inclusive). A random number seed has been specified here, and the same random number seed is used later for $P_2$ (1990-2011) so that the only difference between the simulations are the summary statistics used.
-
-
-```{r}
-
-set.seed(20)
-ten_k_runs <- 
-  e0_ch_summary %>% 
-    mutate(
-      draws = map2(
-        .x = mean_de0, .y = sd_de0, 
-        .f = ~replicate(10000, rnorm(n = 7, mean = .x, sd = .y))
-        )
-      ) %>% 
-  mutate(
-    draw_df = map(
-      draws,
-      ~.x %>% 
-        data.frame() %>% 
-        mutate(k = 1:n()) %>% 
-        gather(-k, key = "rep", value = "change") %>% 
-        mutate(rep = str_remove(rep, "X") %>% 
-                 as.numeric()
-        )               
-      )
-  ) %>% 
-  select(sex, draw_df) %>% 
-  unnest(cols = c(draw_df))
-
-
-# a 1% sample 
-```
-
-The following code shows 100 of the 10,000 simulations. A smoothed curve is added to show the average change per period, which should be positive and broadly constant.
-
-```{r}
-
-ten_k_runs %>% 
-  filter(rep %in% sample(1:10000, 100)) %>% 
-  ggplot(aes(x = k, y = change)) +
-  facet_wrap(~sex) + 
-  geom_line(aes(group = rep), alpha = 0.2) +
-  stat_smooth()
-```
-
-# to accumulate with 2011 observation as 0th value 
-
-The following code chunk changes these estimated annual changes into predicted changes, by accumulating the simulated values up until the current period $k$, and adding the 2011 life expectancy to these accumulated changes. The first few rows of the dataset are then shown.
-
-```{r}
-
-ten_k_all_accumulated <- 
-  ten_k_runs %>% 
-    left_join(dta_scot_tidy %>% filter(year == 2011) %>% select(-year)) %>% 
-    group_by(sex, rep) %>% 
-    arrange(k) %>% 
-    mutate(
-      cumulative_change = cumsum(change),
-      prediction        = e0 + cumulative_change
-    ) %>% 
-    ungroup() %>% 
-    mutate(year = k + 2011) %>% 
-  left_join(
-    dta_scot_tidy %>% rename(obs_e0 = e0)
-  )
-
-ten_k_all_accumulated
-```
-
-Next, summary statistics are produced for each sex and projection period showing the mean, median, and upper and lower 90% and 95% quantiles. 
-
-```{r}
-ten_k_all_qis <- 
-  ten_k_all_accumulated %>% 
-  group_by(sex, year) %>% 
-  summarise(
-    mean_e0 = mean(prediction),
-    med_e0  = median(prediction),
-    low_95   = quantile(prediction, 0.025),
-    high_95  = quantile(prediction, 0.975),
-    low_90   = quantile(prediction, 0.050),
-    high_90  = quantile(prediction, 0.950)
-  ) %>% 
-  ungroup()
-```
-
-A 5% sample of of the simulated projections, along with the 90% and 95% intervals, are are shown in the image below. The observed life expectancies are also shown as points. 
-
-
-```{r}
-ten_k_5pc_accumulated <- 
-  ten_k_all_accumulated %>% 
-  filter(rep %in% sample(1:10000, 500)) 
-  
-ten_k_5pc_accumulated %>%  
-  ggplot(aes(x = year, y = prediction, group = rep)) + 
-  facet_wrap(~sex) + 
-  geom_line(alpha = 0.025) + 
-  geom_ribbon(aes(x = year, ymin = low_90, ymax = high_90),
-              data = ten_k_all_qis,
-              inherit.aes = FALSE,
-              alpha = 0.2
-  ) + 
-  geom_ribbon(aes(x = year, ymin = low_95, ymax = high_95),
-              data = ten_k_all_qis,
-              inherit.aes = FALSE,
-              alpha = 0.2
-  ) + 
-  geom_line(
-    aes(x = year, y = med_e0),
-    data = ten_k_all_qis,
-    inherit.aes = FALSE,
-    colour = "red", size = 1.2
-  ) + 
-  geom_line(
-    aes(x = year, y = mean_e0),
-    data = ten_k_all_qis,
-    inherit.aes = FALSE,
-    colour = "darkgreen", size = 1.2, linetype = "dashed"
-  ) + 
-  geom_point(aes(y = obs_e0), size = 2) +
-  labs(
-    x = "Year", y = "Predicted/observed life expectancy",
-    title = "Life expectancy against 1950-2011 trend",
-    subtitle = "Red: Median of predictions; Green: Mean of predictions\nShaded regions: 90% and 95% credible intervals",
-    caption = "Source: HMD; ONS/NRS for 2017 and 2018 (male/female only); faint lines show 5% of the 10,000 predicted values"
-  )
-ggsave("figures/obs_vs_pred_e0_1950_2011.png", height = 15, width = 25, units = "cm", dpi = 300)
-
-```
-
-From these figures it has become ever clearer that the the observed values have fallen ever further below the projected range, essentially flatlining after 2014, though broadly following the middle of the trendline for 2012-2014. The relative decline, against the range of expected values, appears to have been more severe for females than males.
-
-The following figure shows how the observed life expectancy for each year compares with the distribution of projected estimates for that year. 
-
-```{r}
-ten_k_all_accumulated %>% 
-  group_by(sex, year) %>% 
-  summarise(empirical_p = mean(prediction < obs_e0)) %>% 
-  spread(sex, empirical_p)
-```
-
-By 2018, only 8% of the model projections for female life expectancy were below the observed life expectancy. For males only 12% of model projections were below the observed values. The relative decline, and sharp fall against projected values, is even more apparent when presenting the above data as a graph.
-
-```{r}
-ten_k_all_accumulated %>% 
-  group_by(sex, year) %>% 
-  summarise(empirical_p = mean(prediction < obs_e0)) %>% 
-  ggplot(aes(x = year, y = empirical_p, group = sex, colour = sex, shape = sex)) + 
-  geom_point() + geom_line() +
-  scale_y_continuous(limits = c(0, 0.70), breaks = seq(0, 0.7, 0.1)) +
-  labs(
-    x = "Year", 
-    y = "Share of predicted values below observed life expectancy",
-    title = "Observed life expectancies against range of predictions based on 1950-2011 trend"
-
-  )
-
-ggsave("figures/trend_observed_percentiles_1950_2011.png", height = 10, width = 12, units = "cm", dpi = 300)
-
-```
-
-```{r}
-obs_percentiles_1950_2011 <- 
-  ten_k_all_accumulated %>% 
-  group_by(sex, year) %>% 
-  summarise(empirical_p = mean(prediction < obs_e0)) %>% 
-  ungroup() %>% 
-  mutate(fit_period = "1950-2011")
-
-```
-
-## Interrim summary
-
-The analyses above have compared observed life expectancies in Scotland against projected life expectancies based on annual changes observed between 1950 and 2011 inclusive ($P_1$). The following analyses repeat this exercise using the more recent pre-slowdown period 1990-2011 ($P_2$). The analyses have shown that life expectancies gains have fallen increasingly far down the range of values that could be plausibly expected based on these earlier trends. 
-
-# Analyses using $P_2$ (1990-2011)
-
-The average annual improvement and standard deviation in these annual changes are calculated below
-
-```{r}
-e0_ch_summary <- 
-  dta_scot_tidy %>% 
-  group_by(sex) %>% 
-  arrange(year) %>% 
-  mutate(delta_e0 = e0 - lag(e0)) %>% 
-  ungroup() %>% 
-  filter(between(year, 1990, 2011)) %>% # NOTE THE CHANGE HERE
-  group_by(sex) %>% 
-  summarise(
-    mean_de0 = mean(delta_e0),
-    sd_de0   = sd(delta_e0)
-  ) %>% 
-  ungroup()
-
-e0_ch_summary_p2 <- e0_ch_summary
-e0_ch_summary
-```
-
-Considering $P_2$, the average improvement rates were slightly higher than over the longer period $P_1$, mainly due to faster rates of improvement for males. Over both 1950-2011 and 1990-2011 female life expectancies increased at around 2.1 years per decade on average, for males the rates of increase were 2.1 years per decade over 1950-2011, and 2.7 years per decade over 1990-2011, leading to catch-up in life expectancies between the sexes. In the latter period 1990-2011 the annual variation was smaller than in the longer time period 1950-2011, with greater reductions in standard deviations for females (standard deviations of 0.25 years per year in the shorter period compared with 0.35 years per year in the longer period) than in males (from 0.29 years per year to 0.25 years per year). Both the reduced variation (especially for females) and the increased average improvement rates (especially for females) suggest that the observed life expectancies will fall proportionately further below the range of projections when using $P_2$ as the reference period than $P_1$. 
-
-```{r}
-e0_ch_summary_p1
-
-
-```
-
-Draws from distributions calibrated on $P_2$ will now be calculated. 
-
-```{r}
-set.seed(20)
-ten_k_runs <- 
-  e0_ch_summary %>% 
-  mutate(
-    draws = map2(
-      .x = mean_de0, .y = sd_de0, 
-      .f = ~replicate(10000, rnorm(n = 7, mean = .x, sd = .y))
-    )
-  ) %>% 
-  mutate(
-    draw_df = map(
-      draws,
-      ~.x %>% 
-        data.frame() %>% 
-        mutate(k = 1:n()) %>% 
-        gather(-k, key = "rep", value = "change") %>% 
-        mutate(rep = str_remove(rep, "X") %>% 
-                 as.numeric()
-        )               
-    )
-  ) %>% 
-  select(sex, draw_df) %>% 
-  unnest(cols = c(draw_df))
-
-```
-
-As before, a 1% sample of samples from the distribution, this time using $P_2$, will now be shown, along with the average improvement rate based on this limited sample. (The average improvement rate based on the complete sample will be much closer and less variable than the observed values)
-
-```{r}
-ten_k_runs %>% 
-  filter(rep %in% sample(1:10000, 100)) %>% 
-  ggplot(aes(x = k, y = change)) +
-  facet_wrap(~sex) + 
-  geom_line(aes(group = rep), alpha = 0.2) +
-  stat_smooth()
-```
-
-And as before, these simulations will now be used to produced projected values against which the observed values can be compared 
-
-```{r}
-ten_k_all_accumulated <- 
-  ten_k_runs %>% 
-  left_join(dta_scot_tidy %>% filter(year == 2011) %>% select(-year)) %>% 
-  group_by(sex, rep) %>% 
-  arrange(k) %>% 
-  mutate(
-    cumulative_change = cumsum(change),
-    prediction        = e0 + cumulative_change
-  ) %>% 
-  ungroup() %>% 
-  mutate(year = k + 2011) %>% 
-  left_join(
-    dta_scot_tidy %>% rename(obs_e0 = e0)
-  )
-
-```
-
-The summary statistics (mean, median, upper and lower 90% and 95% quantiles)
-
-```{r}
-ten_k_all_qis <- 
-  ten_k_all_accumulated %>% 
-  group_by(sex, year) %>% 
-  summarise(
-    mean_e0 = mean(prediction),
-    med_e0  = median(prediction),
-    low_95   = quantile(prediction, 0.025),
-    high_95  = quantile(prediction, 0.975),
-    low_90   = quantile(prediction, 0.050),
-    high_90  = quantile(prediction, 0.950)
-  ) %>% 
-  ungroup()
-ten_k_all_qis
-
-```
-
-And now the equivalent visualisation showing observed against range of projected values will now be produced
-
-```{r}
-ten_k_2pc_accumulated <- 
-  ten_k_all_accumulated %>% 
-  filter(rep %in% sample(1:10000, 500)) 
-
-ten_k_2pc_accumulated %>%  
-  ggplot(aes(x = year, y = prediction, group = rep)) + 
-  facet_wrap(~sex) + 
-  geom_line(alpha = 0.025) + 
-  geom_ribbon(aes(x = year, ymin = low_90, ymax = high_90),
-              data = ten_k_all_qis,
-              inherit.aes = FALSE,
-              alpha = 0.2
-  ) + 
-  geom_ribbon(aes(x = year, ymin = low_95, ymax = high_95),
-              data = ten_k_all_qis,
-              inherit.aes = FALSE,
-              alpha = 0.2
-  ) + 
-  geom_line(
-    aes(x = year, y = med_e0),
-    data = ten_k_all_qis,
-    inherit.aes = FALSE,
-    colour = "red", size = 1.2
-  ) + 
-  geom_line(
-    aes(x = year, y = mean_e0),
-    data = ten_k_all_qis,
-    inherit.aes = FALSE,
-    colour = "darkgreen", size = 1.2, linetype = "dashed"
-  ) + 
-  geom_point(aes(y = obs_e0), size = 2) +
-  labs(
-    x = "Year", y = "Predicted/observed life expectancy",
-    title = "Life expectancy against 1990-2011 trend",
-    subtitle = "Red: Median of predictions; Green: Mean of predictions\nShaded regions: 90% and 95% credible intervals",
-    caption = "Source: HMD; ONS/NRS for 2017 and 2018 (male/female only); faint lines show 5% of the 10,000 predicted values"
-  )
-
-ggsave("figures/obs_vs_pred_e0_1990_2011.png", height = 15, width = 25, units = "cm", dpi = 300)
-```
-
-As implied by the higher average improvement rates and reduced annual variation over $P_2$ compared with $P_1$, the observed values fall even lower against the distribution of projected values, with observed life expectancies for both males and females in 2018 falling to around the bottom 5% (lower end of the lighter grey credible interval band) of the distribution of projections. The table below, and subsequent figure, show where the observed life expectancies fall against the range of projected values for each year.
-
-```{r}
-ten_k_all_accumulated %>% 
-  group_by(sex, year) %>% 
-  summarise(empirical_p = mean(prediction < obs_e0)) %>% 
-  spread(sex, empirical_p)
-```
-
-By 2018, less than 3% of the projected estimates for life expectancy in 2018 were below the observed life expectancy. As with the range of distributions based on $P_1$, values fell against expectations from 2014 onwards and have not recovered since. 
-
-
-
-```{r}
-ten_k_all_accumulated %>% 
-  group_by(sex, year) %>% 
-  summarise(empirical_p = mean(prediction < obs_e0)) %>% 
-  ggplot(aes(x = year, y = empirical_p, group = sex, colour = sex, shape = sex)) + 
-  geom_point() + geom_line() +
-  scale_y_continuous(limits = c(0, 0.70), breaks = seq(0, 0.7, 0.1)) +
-  labs(
-    x = "Year", 
-    y = "Observation as percentile of predicted long-term trend distribution",
-    title = "Observed life expectancies against range of predictions based on 1990-2011 trend"
-  )
-
-ggsave("figures/trend_observed_percentiles_1990_2011.png", height = 10, width = 12, units = "cm", dpi = 300)
-```
-
-```{r}
-obs_percentiles_1990_2011 <- 
-  ten_k_all_accumulated %>% 
-  group_by(sex, year) %>% 
-  summarise(empirical_p = mean(prediction < obs_e0)) %>% 
-  ungroup() %>% 
-  mutate(fit_period = "1990-2011")
-```
-
-
-The following figure shows how the observed life expectancies fell compared with the range of projected life expectancies for each year using both the $P_1$ and $P_2$ projections.
-
-```{r}
-obs_percentiles_1950_2011 %>% 
-  bind_rows(
-    obs_percentiles_1990_2011
-  ) %>% 
-  ggplot(aes(x = year, y = empirical_p, group = sex, colour = sex, shape = sex)) + 
-  facet_wrap(~fit_period) + 
-  geom_point() + geom_line() +
-  scale_y_continuous(limits = c(0, 0.70), breaks = seq(0, 0.7, 0.1)) +
-  labs(
-    x = "Year", y = "Percentile",
-    title = "Observed e0 against range of expectations, by trend fit period"
-  )
-
-ggsave("figures/trend_observed_percentiles_bothperiods.png", height = 15, width = 20, units = "cm", dpi = 300)
-```
-
-
-# Projections against expected for mortality rates at single ages 
-
-The same process to projecting forward life expectancies at birth $e_0$ can also be applied to age specific mortality rates $m_x$. To have a consistent data source, with associated consistency in methods applied, let's use the single year lifetable data used to extract the 2017 and 2018 life expectancies previously.
-
-
-```{r}
-readxl::excel_sheets("data/singleyearlifetablesscotland1.xls")
-
-#Data are available from 1980. Each year is a worksheet. Within each worksheet the data are in the same cell locations 
-
-clean_data <- function(X){
-  out <- X %>% 
-  select(-junk) %>% 
-  gather(-x, key = "sex_quant", value = "value") %>% 
-  separate(sex_quant, into = c("sex", "variable")) %>% 
-  mutate(sex = case_when(sex == 'm' ~ "male", sex == 'f' ~ "female", TRUE ~ NA_character_))
-  return(out)    
-}
-
-mx_data <- 
-  tibble(
-    year = as.character(1980:2018)
-  ) %>% 
-    mutate(dirty_data = map(
-      year, 
-      ~read_excel(
-        path = "data/singleyearlifetablesscotland1.xls",
-        range = "A8:L108",
-        col_names = c("x", "m_mx", "m_qx", "m_lx", "m_dx", "m_ex", "junk", "f_mx", "f_qx", "f_lx", "f_dx", "f_ex"),
-        sheet = .x
-        ))
-    ) %>% 
-    mutate(
-      tidy_data = map(dirty_data, clean_data)
-    ) %>% 
-    select(-dirty_data) %>% 
-    unnest() %>% 
-  spread(variable, value) %>% 
-  mutate(year = as.numeric(year))
-
-mx_data
-
-
-```
-
-Now to save this 
-
-```{r}
-mx_data %>% write_csv("data/mx_data_scot_1980_2018.csv")
-
-```
-
-Let's visualise how $m_x$ has changed at various ages
-
-```{r}
-ggplot(mx_data, aes(x = year, y = mx, colour = x, group = x)) + 
-  geom_line() + 
-  facet_wrap(~sex) +
-  scale_y_log10() +
-  scale_colour_distiller(palette = "Paired")
-
-
-```
-
-
-Indexing all values to initial year, what's the percentage trend across all ages, and how much variation (implicitly this is about understanding how reasonable the drift assumption $k$ in the Lee-Carter spec seems to be)
-
-```{r}
-mx_data %>% 
-  select(year, x, sex, mx) %>% 
-  mutate(lnmx = log10(mx)) %>% 
-  group_by(x, sex) %>% 
-  mutate(indexed_lnmx = 100 * (lnmx - lnmx[year == 1980] )) %>% 
-  ggplot(aes(x = year, y = indexed_lnmx)) + 
-  geom_point(aes(colour = x), alpha = 0.25) +
-  facet_wrap(~sex) + 
-  scale_colour_distiller(palette = "Paired") +
-  stat_smooth() + 
-  stat_smooth(method = "lm", colour = "grey")
-
-
-
-
-```
-
-The nonlinear smoother, indicated by the blue line, is similar to the linear regression line of best fit, indicating that the linear drift assumption made in Lee-Carter modelling approach is not unreasonable. However it is clear that mortality rates in young children (orange colours) seem to be improving proportionately faster than the general trend, improvement rates are somewhat faster in early retirement ages (light greens), and mortality rate trends are persistently worse than the trend in young adulthood (red/pinky colours). 
-
-
-To avoid getting too sucked into the fascinating enormity of mortality data, let's define the task very carefully:
-
-* For each sex and age in single years
-    * For 1990-2011
-    * Calculate mean and SD in log $m_x$
-    * Generate 1000 simulations for 7 forward periods
-    * Show against observed for 2012-2018 for a few specific ages 
-        * 0
-        * 25
-        * 45
-        * 65
-        * 80
-        * 90 
-    * Calculate empirical quantiles for all ages 
-        * show as heatmap and/or linemaps
-        
-```{r}
-set.seed(20)
-
-
-mx_data %>%
-  filter(between(year, 1990, 2011)) %>% 
-  mutate(mx = mx + 1E-6) %>%  #continuity correction
-  select(x, sex, year, mx) %>% 
-  group_by(x, sex) %>% 
-  arrange(year) %>% 
-  mutate(lnmx = log(mx)) %>% 
-  mutate(d_lnmx = lnmx - lag(lnmx)) %>% 
-  summarise(
-    mean_ch = mean(d_lnmx, na.rm = TRUE),
-    sd_ch   = sd(d_lnmx, na.rm = TRUE)
-  ) %>% 
-  mutate(
-    predblock  = map2(.x = mean_ch, .y = sd_ch, ~replicate(1000,rnorm(n = 7, mean = .x, sd = .y)))  
-  )
-
-```
-
-Let's quickly look at how the variability varies against age
-
-```{r}
-mx_data %>%
-  filter(between(year, 1990, 2011)) %>% 
-  mutate(mx = mx + 1E-6) %>%  #continuity correction
-  select(x, sex, year, mx) %>% 
-  group_by(x, sex) %>% 
-  arrange(year) %>% 
-  mutate(lnmx = log(mx)) %>% 
-  mutate(d_lnmx = lnmx - lag(lnmx)) %>% 
-  summarise(
-    mean_ch = mean(d_lnmx, na.rm = TRUE),
-    sd_ch   = sd(d_lnmx, na.rm = TRUE)
-  ) %>% 
-  ungroup() %>% 
-  mutate(
-    var_ch = sd_ch ^ 2,
-    inv_var = 1/ var_ch,
-    norm_inv_var = inv_var / max(inv_var)
-  )  %>% 
-  ggplot(aes(x = x, y = mean_ch, alpha = norm_inv_var, group = sex, colour = sex, shape = sex)) + 
-  geom_point() +
-  labs(
-    x = "Age in single years", 
-    y = "Trend in mortality improvement at age",
-    title = "Average mortality improvement at individual ages, 1990-2011",
-    subtitle = "More solid colours indicate greater consistency in improvement rates"
-  ) +
-  geom_hline(yintercept = 0) +
-  guides(alpha = FALSE) +
-  scale_x_continuous(breaks = seq(0, 90, by = 10)) +
-  scale_y_continuous(limits = c(-0.10, 0.025), breaks = seq(-0.10, 0.02, by = 0.01))
-  
-
-```
-
-
-So, there's a relatively consistent rate of improvement, with comparatively low variability, between around age 55 and 80, as well as in infancy. From about age 80 onwards improvement rates become consistently smaller. In adulthood, from around age 20-45, mortality rate trends are often worsening rather than improving, however at most ages below 55 there is also greater annual variability, hence feinter points. 
-
-Also note the rates after 55 tend to be lower for males than females, consistent with this being a period of greater catch-up in mortality outcomes between the sexes. 
-
-# mx and ex for all nation from ONS 
+## mx and ex for all nation from ONS 
 
 We'll now use the tables from [this location](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/singleyearlifetablesuk1980to2018) to get $e_0$, $m_x$ and related lifetable quantities from a single source, for each UK nation. 
 
@@ -800,6 +84,10 @@ ons_lifetables <- tribble(
   "Great Britain"   , "singleyearlifetablesgreatbritain1.xls",
   "United Kingdom",   "singleyearlifetablesunitedkingdom1.xls"
 )
+```
+
+
+```{r fn_clean_data}
 
 clean_data <- function(X){
   out <- X %>% 
@@ -809,7 +97,9 @@ clean_data <- function(X){
   mutate(sex = case_when(sex == 'm' ~ "male", sex == 'f' ~ "female", TRUE ~ NA_character_))
   return(out)    
 }
+```
 
+```{r fn_get_mx_data}
 get_mx_data <- function(path){
   tibble(
     year = as.character(1980:2018)
@@ -827,16 +117,18 @@ get_mx_data <- function(path){
       tidy_data = map(dirty_data, clean_data)
     ) %>% 
     select(-dirty_data) %>% 
-    unnest() %>% 
+    unnest(cols = c(tidy_data)) %>% 
   spread(variable, value) %>% 
   mutate(year = as.numeric(year))
 }
+```
 
+```{r, cache = TRUE}
 ons_lifetables <- 
   ons_lifetables %>% 
-    mutate(mx_data = map(file_location, ~.x %>% paste0("data/", .) %>% get_mx_data())) %>% 
+    mutate(mx_data = map(file_location, ~.x %>% here("data",.) %>% get_mx_data())) %>% 
     select(-file_location) %>% 
-    unnest()
+    unnest(cols = c(mx_data))
 
 ons_lifetables
 
@@ -853,13 +145,13 @@ ons_e0 <-
 
 ons_e0
 
-write_csv(ons_e0, "data/e0_from_ons_allnations.csv")
+write_csv(ons_e0, here("data", "e0_from_ons_allnations.csv"))
 ```
 
 
 Now to get summaries for each population and sex
 
-```{r}
+```{r fn_get_summary_changes}
 get_summary_changes <- function(data, period = c(1990, 2011)){
   data %>% 
     arrange(year) %>% 
@@ -870,7 +162,9 @@ get_summary_changes <- function(data, period = c(1990, 2011)){
       sd_de0   = sd(delta_e0)
     ) 
 }
+```
 
+```{r}
 ons_summary_changes <- 
   ons_e0 %>% 
     group_by(population, sex) %>% 
@@ -880,7 +174,9 @@ ons_summary_changes <-
     unnest()
 
 ons_summary_changes
+```
 
+```{r}
 ons_summary_changes %>% 
   ggplot(aes(x = mean_de0, y = sd_de0, colour = sex, shape = sex)) + 
   geom_point() +
@@ -894,7 +190,7 @@ ons_summary_changes %>%
 Now to extract the 2011 value, run the simulations, and extract summary stats from the simulations 
 
 
-```{r, cache = TRUE}
+```{r fn_run_simulations}
 run_simulations <- function(mean, sd, k=7, m=10000, seed = 20){
   set.seed(seed)
   tibble(
@@ -915,10 +211,14 @@ run_simulations <- function(mean, sd, k=7, m=10000, seed = 20){
         )               
     )
   ) %>% 
-  select(draw_df) %>% unnest()
+  select(draw_df) %>% 
+  unnest(cols = c(draw_df))
 }
+```
 
+```{r, cache = TRUE}
 
+set.seed(12)
 allnations_preds <- 
   ons_summary_changes %>% 
     left_join(
@@ -931,7 +231,7 @@ allnations_preds <-
       simblock = map2(.x = mean_de0, .y = sd_de0, run_simulations, m = 10000)
     ) %>% 
     select(population, sex, e0_2011, simblock) %>% 
-    unnest() %>% 
+    unnest(cols = c(simblock) ) %>% 
     group_by(population, sex, rep) %>% 
     arrange(k) %>% 
     mutate(
@@ -993,7 +293,11 @@ allnations_preds %>%
     axis.text.x = element_text(angle = 90)
   )
 
-ggsave("figures/allnations_ons_projections.png", height = 15, width = 25, units = "cm", dpi = 300)
+ggsave(here("figures","allnations_ons_projections.png"), height = 15, width = 25, units = "cm", dpi = 300)
+ggsave(here("figures","allnations_ons_projections.svg"), height = 15, width = 25, units = "cm", dpi = 300)
+ggsave(here("figures","allnations_ons_projections.eps"))
+ggsave(here("figures","allnations_ons_projections.wmf"))
+
 
 
 
@@ -1011,17 +315,17 @@ ons_summary_changes_81 <-
     nest() %>% 
     mutate(summary_stats = map(data, get_summary_changes, period = c(1981, 2011))) %>% 
     select(-data) %>% 
-    unnest()
+    unnest(cols = c(summary_stats))
 
 ons_summary_changes_81
 
-ons_summary_changes
 
 ```
 
 
 
 ```{r, cache = TRUE}
+set.seed(12)
 allnations_preds_81 <- 
   ons_summary_changes_81 %>% 
     left_join(
@@ -1034,7 +338,7 @@ allnations_preds_81 <-
       simblock = map2(.x = mean_de0, .y = sd_de0, run_simulations, m = 10000)
     ) %>% 
     select(population, sex, e0_2011, simblock) %>% 
-    unnest() %>% 
+    unnest(cols = c(simblock)) %>% 
     group_by(population, sex, rep) %>% 
     arrange(k) %>% 
     mutate(
@@ -1097,7 +401,7 @@ allnations_preds_81 %>%
     axis.text.x = element_text(angle = 90)
   )
 
-ggsave("figures/allnations_ons_projections_longer.png", height = 15, width = 25, units = "cm", dpi = 300)
+ggsave(here("figures", "all_nations_ons_projections_longer.png"), height = 15, width = 25, units = "cm", dpi = 300)
 
 
 
@@ -1109,7 +413,7 @@ Project forward another decade
 
 ```{r}
 
-
+set.seed(12)
 allnations_next_decade_targets <- 
   ons_summary_changes %>% 
     left_join(
@@ -1122,7 +426,7 @@ allnations_next_decade_targets <-
       simblock = map2(.x = mean_de0, .y = sd_de0, run_simulations, m = 10000, k = 17) #instead of 7 for main analysis
     ) %>% 
     select(population, sex, e0_2011, simblock) %>% 
-    unnest() %>% 
+    unnest(cols = c(simblock)) %>% 
     group_by(population, sex, rep) %>% 
     arrange(k) %>% 
     mutate(
@@ -1176,7 +480,7 @@ allnations_next_decade_targets %>%
   )
 
 
-ggsave("figures/allnations_ons_10yeartargets.png", height = 15, width = 25, units = "cm", dpi = 300)
+ggsave(here("figures", "allnations_ons_10yeartargets.png"), height = 15, width = 25, units = "cm", dpi = 300)
 
 
 
@@ -1198,7 +502,7 @@ allnations_next_decade_targets %>%
     high_90  = quantile(prediction, 0.950)
   ) %>% 
   ungroup() %>% 
-  write_csv("data/predictions_to_2028.csv")
+  write_csv(here("data", "predictions_to_2028.csv"))
 
 ```
 
@@ -1222,7 +526,7 @@ allnations_preds %>%
   )
 
 
-ggsave("figures/allnations_projected_observed.png",height = 15, width = 20, units = "cm", dpi = 300)
+ggsave(here("figures", "allnations_projected_observed.png"),height = 15, width = 20, units = "cm", dpi = 300)
 
 
 
