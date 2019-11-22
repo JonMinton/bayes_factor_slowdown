@@ -531,3 +531,106 @@ ggsave(here("figures", "allnations_projected_observed.png"),height = 15, width =
 
 
 ```
+
+
+Longer project forward period, based on longer historic period 
+
+
+```{r, cache=TRUE}
+
+set.seed(12)
+allnations_next_decade_targets_from81 <- 
+  ons_summary_changes %>% 
+    left_join(
+      ons_e0 %>% 
+        filter(year == 2011) %>% 
+        select(-year) %>% 
+        rename(e0_2011 = e0)
+    ) %>% 
+    mutate(
+      simblock = map2(.x = mean_de0, .y = sd_de0, run_simulations, m = 10000, k = 17) #instead of 7 for main analysis
+    ) %>% 
+    select(population, sex, e0_2011, simblock) %>% 
+    unnest(cols = c(simblock)) %>% 
+    group_by(population, sex, rep) %>% 
+    arrange(k) %>% 
+    mutate(
+      cumulative_change = cumsum(change),
+      prediction = e0_2011 + cumulative_change,
+      year = k + 2011
+    ) 
+
+allnations_next_decade_targets_from81
+
+```
+
+
+
+
+```{r}
+allnations_next_decade_targets_from81 %>% 
+  group_by(population, sex, year) %>% 
+  summarise(
+    mean_pred = mean(prediction),
+    med_pred  = median(prediction),
+    low_95   = quantile(prediction, 0.025),
+    high_95  = quantile(prediction, 0.975),
+    low_90   = quantile(prediction, 0.050),
+    high_90  = quantile(prediction, 0.950)
+  ) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = year)) + 
+  facet_grid(sex ~ population) + 
+  geom_ribbon(aes(ymin = low_90, ymax = high_90),
+              alpha = 0.2
+  ) + 
+  geom_ribbon(aes(ymin = low_95, ymax = high_95),
+              alpha = 0.2
+  ) + 
+  geom_line(
+    aes(y = med_pred),
+    colour = "red", size = 1.2
+  ) + 
+  geom_line(
+    aes(y = mean_pred),
+    colour = "darkgreen", size = 1.2, linetype = "dashed"
+  ) + 
+  labs(
+    x = "Year", y = "Life expectancy at birth in years",
+    title = "Life expectancy 10 year target against 1981-2011 trend",
+    subtitle = "Red: Median of predictions; Green: Mean of predictions\nShaded regions: 90% and 95% credible intervals",
+    caption = "Source: ONS single year lifetables"
+  ) +
+  geom_vline(xintercept = 2018, linetype = "dashed") + 
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+
+
+ggsave(here("figures", "allnations_ons_10yeartargets_from1981.png"), height = 15, width = 25, units = "cm", dpi = 300)
+
+
+
+```
+
+
+And as a table 
+
+```{r}
+allnations_next_decade_targets_from81 %>% 
+  group_by(population, sex, year) %>% 
+  summarise(
+    mean_pred = mean(prediction),
+    sd_pred   = sd(prediction),
+    med_pred  = median(prediction),
+    low_95   = quantile(prediction, 0.025),
+    high_95  = quantile(prediction, 0.975),
+    low_90   = quantile(prediction, 0.050),
+    high_90  = quantile(prediction, 0.950)
+  ) %>% 
+  ungroup() %>% 
+  write_csv(here("data", "predictions_to_2028_from1981.csv"))
+
+```
+
+
