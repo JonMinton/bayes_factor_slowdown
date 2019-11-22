@@ -528,7 +528,7 @@ allnations_preds %>%
 
 ggsave(here("figures", "allnations_projected_observed.png"),height = 15, width = 20, units = "cm", dpi = 300)
 
-
+ggsave(here("figures", "allnations_projected_observed.svg"), height = 15, width = 20, units = "cm", dpi = 300)
 
 ```
 
