@@ -2,9 +2,9 @@
 title: "Scotland Mortality Projections"
 author: "Jon Minton"
 output:
-  word_document: default
   html_document:
     df_print: paged
+  word_document: default
 ---
 
 # Introduction
@@ -540,7 +540,7 @@ Longer project forward period, based on longer historic period
 
 set.seed(12)
 allnations_next_decade_targets_from81 <- 
-  ons_summary_changes %>% 
+  ons_summary_changes_81 %>% 
     left_join(
       ons_e0 %>% 
         filter(year == 2011) %>% 
