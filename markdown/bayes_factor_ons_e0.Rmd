@@ -1,0 +1,230 @@
+---
+title: "Bayes Factor Slowdown using ONS data"
+output:
+  html_document:
+    df_print: paged
+    code_folding: hide
+    message: false
+    warning: false
+---
+
+# Introduction 
+
+This document will calculate Bayes Factors based on UK nation datas from the ONS.
+
+```{r}
+pacman::p_load(tidyverse, here, changepoint, segmented, ggrepel)
+
+```
+
+```{r}
+write_to_table <- function(x, loc){
+  write_csv(x, loc)
+  x
+}
+
+```
+
+
+# Load data 
+
+```{r}
+dta_e0 <- read_csv(here("data", "e0_from_ons_allnations.csv"))
+
+dta_e0
+```
+
+Visualise the life expectancy and change in life expectancy for each year 
+
+```{r, fig.width = 12, fig.height = 12}
+dta_e0 %>% 
+  group_by(population, sex) %>% 
+  arrange(year) %>% 
+  mutate(ch_e0 = e0 - lag(e0)) %>% 
+  ungroup() %>% 
+  mutate(
+    population = fct_relevel(population, c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland"))
+  ) %>% 
+  mutate(ch_e0 = 52.25 * ch_e0) %>% 
+  ggplot(aes(x = year, y = ch_e0)) + 
+  stat_smooth() +
+  geom_point() + geom_line() + 
+  facet_wrap(population ~ sex) + 
+  geom_hline(yintercept = 0) + 
+  labs(
+    x = "Year", y = "Annual change in life expectancy from previous year (in weeks)",
+    title = "Annual period life expectancy changes in UK and UK nations",
+    caption = "Source: ONS life tables (single years)"
+  ) 
+
+```
+
+
+From the above it seems most populations have seen a slowdown in improvement in recent years, and on average relatively stable improvements previously, with the exception of Northern Ireland, which saw a slowdown in improvement in the 1980s. The smaller populations tend to exhibit greater variability in annual rates of change than the larger populations. The extent of oscillation (negative autocorrelation from one year to the next) also apepars greater in smaller populations. It is not immediately clear that the breakpoint for the slowdown is the same for all UK populations.  
+
+Let's now explore the slowdown by running breakpoint analysis 
+
+```{r}
+dta_e0 %>% 
+  group_by(population, sex) %>% 
+  arrange(year) %>% 
+  mutate(ch_e0 = e0 - lag(e0)) %>% 
+  ungroup() %>% 
+  filter(!is.na(ch_e0)) %>% 
+  select(-e0) %>% 
+  mutate(pop_sex = paste(population, sex, sep = "_")) %>% 
+  select(pop_sex, year, ch_e0) %>% 
+  filter(pop_sex == "United Kingdom_female") %>% 
+  pull(ch_e0) %>%  
+  cpt.mean() %>% plot()
+
+# %>% 
+#   spread(pop_sex, ch_e0) %>% (function(x){
+#     tmp <- x %>% pull(year)
+#     mtrx <- as.matrix(x %>% select(-year)) 
+#     row.names(mtrx) <- tmp
+#     mtrx %>% t()
+#   }) %>% 
+#   cpt.mean(penalty = "None", Q = 2) -> cpts
+
+```
+
+How about package `segmented` instead? This might be more appropriate as the change is apparently gradual rather than discrete 
+
+```{r}
+
+datablocks <- 
+  dta_e0 %>% 
+    group_by(population, sex) %>% 
+    arrange(year) %>% 
+    mutate(ch_e0 = e0 - lag(e0)) %>% 
+    ungroup() %>% 
+    filter(!is.na(ch_e0)) %>% 
+    select(-e0) %>% 
+    group_by(population, sex) %>% 
+    nest() 
+
+
+
+segmods_1brk <- vector(mode = "list", length = 14)
+segmods_2brk <- vector(mode = "list", length = 14)
+segmods_3brk <- vector(mode = "list", length = 14)
+
+for (i in 1:14){
+  this_data <- datablocks[["data"]][[i]]
+  
+  this_linmod <- lm(ch_e0 ~ year, data = this_data)
+  
+  this_segmod_1brk <- tryCatch(segmented(this_linmod, npsi = 1), finally = NULL)
+  this_segmod_2brk <- tryCatch(segmented(this_linmod, npsi = 2), finally = NULL)
+  this_segmod_3brk <- tryCatch(segmented(this_linmod, npsi = 3), finally = NULL)
+  
+  segmods_1brk[[i]] <- this_segmod_1brk
+  segmods_2brk[[i]] <- this_segmod_2brk
+  segmods_3brk[[i]] <- this_segmod_3brk
+  
+}
+
+# segmented::segmented()
+
+```
+
+
+Let's pull the 1 breakpoint estimates 
+
+```{r}
+get_brks <- function(x){
+  tryCatch(summary(x)$psi[,2], finally = NULL)
+}
+
+datablocks %>% 
+  ungroup() %>% 
+  mutate(
+    segmod_1brk  = segmods_1brk,
+    segmod_2brk = segmods_2brk,
+    segmod_3brk = segmods_3brk
+  ) %>% 
+  mutate(
+    brks_1 = map_dbl(segmod_1brk, get_brks),
+    brks_2 = map(segmod_2brk, get_brks),
+    brks_3 = map(segmod_3brk, get_brks)
+  )
+
+```
+
+
+This shows that 1 breakpoint models can be identified for each population, but 2 and 3 breakpoint models only for some populations. For almost all populations, except Northern Ireland, the breakpoint is identified as around 2009 (so the change from 2009 to 2010)
+
+Let's extract the 1 breakpoint models and standard errors, and present these 
+
+```{r}
+datablocks %>% 
+  ungroup() %>% 
+  mutate(
+    segmod_1brk  = segmods_1brk
+  ) %>% 
+  mutate(
+    brk_year = map_dbl(segmod_1brk, ~summary(.x)$psi[2]),
+    brk_se   = map_dbl(segmod_1brk, ~summary(.x)$psi[3])
+  ) %>% 
+  select(population, sex, brk_year, brk_se) %>% 
+  mutate(
+    brk_lwr = brk_year - 2 * brk_se, 
+    brk_upr = brk_year + 2 * brk_se
+  ) %>% 
+  mutate(
+    population = fct_relevel(population, rev(c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland")))
+  ) %>% 
+  ggplot(aes(x = brk_year, y = population)) + 
+  geom_point() + 
+  geom_errorbarh(aes(xmin = brk_lwr, xmax=brk_upr), height = 0.2) + 
+  facet_wrap(~sex) + 
+  geom_vline(xintercept = 2018) + 
+  labs(
+    x = "Year", 
+    y = "Population",
+    title = "Estimates of breakpoint years from one breakpoint models",
+    subtitle = "Error bars show two standard errors around estimate",
+    caption = "Source: ONS Single Year Lifetables"
+  
+  ) + 
+  theme_light()
+```
+
+This shows a lot of consistency in estimates of when the breakdown occurred. With the exception of Northern Ireland, we can use 2010 afterwards as 'post-slowdown', and the years from 1980 onwards as 'pre-slowdown'.
+
+Now, let's determine the average change (and SD) from 1980 to 2010
+
+```{r}
+dta_e0 %>% 
+  group_by(population, sex) %>% 
+  arrange(year) %>% 
+  mutate(ch_e0 = e0 - lag(e0)) %>% 
+  ungroup() %>% 
+  filter(!is.na(ch_e0)) %>%
+  filter(year < 2010) %>% 
+  select(-e0) %>% 
+  group_by(population, sex) %>% 
+  arrange(year) %>% 
+  summarise(
+    mean_ch = mean(ch_e0),
+    sd_ch   = sd(ch_e0)   
+  ) %>% 
+  write_to_table(here("data", "mean_sd_ch_preslowdown_ons.csv")) %>% 
+  mutate(mean_ch = mean_ch * 52.25, sd_ch = sd_ch * 52.25) %>% 
+  ggplot(aes(x = mean_ch, y = sd_ch, shape = sex, colour = sex)) + 
+  geom_point() + 
+  geom_text_repel(aes(label = population, colour = sex), show.legend = FALSE) + 
+  labs(
+    x = "Mean annual change in life expectancy in weeks",
+    y = "Standard deviation in annual change in life expectancy in weeks", 
+    title = "Mean and standard deviation of change in life expectancy\nfrom 1980 to 2010 by UK population",
+    caption = "Source: ONS Single Year Lifetables"
+  ) +
+  
+
+ggsave(here("figures", "mean_sd_preslowdown_improvement_ons.png"), height = 20, width = 20, units = "cm", dpi = 300)
+```
+
+
+For each of these populations, we can estimate the relative likelihood of observing the observed life expectancies from 2011 onwards under the assumption that each population's fundamentals of life expectancy improvement 
