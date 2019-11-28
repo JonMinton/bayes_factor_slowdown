@@ -13,7 +13,12 @@ output:
 This document will calculate Bayes Factors based on UK nation datas from the ONS.
 
 ```{r}
-pacman::p_load(tidyverse, here, changepoint, segmented, ggrepel)
+pacman::p_load(tidyverse, here, changepoint, segmented, ggrepel, knitr, kableExtra, HMDHFDplus)
+
+```
+
+```{r}
+source(here("scripts", "load_packages_and_functions.R"))
 
 ```
 
@@ -54,8 +59,11 @@ dta_e0 %>%
   labs(
     x = "Year", y = "Annual change in life expectancy from previous year (in weeks)",
     title = "Annual period life expectancy changes in UK and UK nations",
+    subtitle = "Blue line and grey band shows smoothed trend",
     caption = "Source: ONS life tables (single years)"
   ) 
+
+ggsave(here("figures", "annual_e0_ch_alluknations_ons.png"), height = 25, width = 25, units = "cm", dpi = 300)
 
 ```
 
@@ -115,9 +123,9 @@ for (i in 1:14){
   
   this_linmod <- lm(ch_e0 ~ year, data = this_data)
   
-  this_segmod_1brk <- tryCatch(segmented(this_linmod, npsi = 1), finally = NULL)
-  this_segmod_2brk <- tryCatch(segmented(this_linmod, npsi = 2), finally = NULL)
-  this_segmod_3brk <- tryCatch(segmented(this_linmod, npsi = 3), finally = NULL)
+  this_segmod_1brk <- tryCatch(segmented(this_linmod, npsi = 1, control = seg.control(seed = 1)), finally = NULL)
+  this_segmod_2brk <- tryCatch(segmented(this_linmod, npsi = 2, control = seg.control(seed = 1)), finally = NULL)
+  this_segmod_3brk <- tryCatch(segmented(this_linmod, npsi = 3, control = seg.control(seed = 1)), finally = NULL)
   
   segmods_1brk[[i]] <- this_segmod_1brk
   segmods_2brk[[i]] <- this_segmod_2brk
@@ -126,6 +134,32 @@ for (i in 1:14){
 }
 
 # segmented::segmented()
+
+```
+
+let's do the above but with five different seeds for a single breakpoint model 
+
+```{r}
+segmods1brk_seed01 <- vector(mode = "list", length = 14)
+segmods1brk_seed02 <- vector(mode = "list", length = 14)
+segmods1brk_seed03 <- vector(mode = "list", length = 14)
+segmods1brk_seed06 <- vector(mode = "list", length = 14)
+segmods1brk_seed08 <- vector(mode = "list", length = 14)
+
+
+for (i in 1:14){
+  this_data <- datablocks[["data"]][[i]]
+  
+  this_linmod <- lm(ch_e0 ~ year, data = this_data)
+  
+  segmods1brk_seed01[[i]] <- tryCatch(segmented(this_linmod, npsi = 1, control = seg.control(seed = 1)), finally = NULL)
+  segmods1brk_seed02[[i]] <- tryCatch(segmented(this_linmod, npsi = 1, control = seg.control(seed = 2)), finally = NULL)
+  segmods1brk_seed03[[i]] <- tryCatch(segmented(this_linmod, npsi = 1, control = seg.control(seed = 3)), finally = NULL)
+  segmods1brk_seed06[[i]] <- tryCatch(segmented(this_linmod, npsi = 1, control = seg.control(seed = 6)), finally = NULL)
+  segmods1brk_seed08[[i]] <- tryCatch(segmented(this_linmod, npsi = 1, control = seg.control(seed = 8)), finally = NULL)
+  
+
+}
 
 ```
 
@@ -193,6 +227,47 @@ datablocks %>%
 
 This shows a lot of consistency in estimates of when the breakdown occurred. With the exception of Northern Ireland, we can use 2010 afterwards as 'post-slowdown', and the years from 1980 onwards as 'pre-slowdown'.
 
+Let's do the same for the five one breakpoint models using different seeds 
+
+```{r}
+datablocks %>% 
+  ungroup() %>% 
+  mutate(
+    `1` = segmods1brk_seed01,
+    `2` = segmods1brk_seed02,
+    `3` = segmods1brk_seed03,
+    `6` = segmods1brk_seed06,
+    `8` = segmods1brk_seed08
+  ) %>% 
+  select(population, sex, `1`:`8`) %>% 
+  gather(key = "seed", value = "model", `1`:`8`) %>% 
+  mutate(
+    brk_year = map_dbl(model, ~summary(.x)$psi[2]),
+    brk_sd   = map_dbl(model, ~summary(.x)$psi[3])
+  ) %>% 
+  ggplot(aes(x = brk_year, y = population, group = seed, shape = seed, colour = seed)) + 
+  geom_point() +
+  facet_wrap(~sex)
+  
+
+# %>% 
+#   mutate(
+#     brk_year = map_dbl(segmod_1brk, ~summary(.x)$psi[2]),
+#     brk_se   = map_dbl(segmod_1brk, ~summary(.x)$psi[3])
+#   ) %>% 
+#   select(population, sex, brk_year, brk_se) %>% 
+#   mutate(
+#     brk_lwr = brk_year - 2 * brk_se, 
+#     brk_upr = brk_year + 2 * brk_se
+#   ) %>% 
+#   mutate(
+#     population = fct_relevel(population, rev(c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland")))
+#   ) 
+
+```
+Break point years, where they can be calculated, are largely identical. They confirm 2010 as a reasonable breakpoint year except for Northern Ireland. 
+
+
 Now, let's determine the average change (and SD) from 1980 to 2010
 
 ```{r}
@@ -227,4 +302,210 @@ ggsave(here("figures", "mean_sd_preslowdown_improvement_ons.png"), height = 20, 
 ```
 
 
-For each of these populations, we can estimate the relative likelihood of observing the observed life expectancies from 2011 onwards under the assumption that each population's fundamentals of life expectancy improvement 
+For each of these populations, we can estimate the relative likelihood of observing the observed life expectancies from 2011 onwards under the assumption that each population's fundamentals of life expectancy improvement had not changed after 2010. This assumption is questionable for Northern Ireland because of its changepoint in the mid 1980s, but will be applied to this population too for consistency with the other populations. 
+
+```{r}
+bf_uk_nations <- 
+  dta_e0 %>% 
+    group_by(population, sex) %>% 
+    arrange(year) %>% 
+    mutate(ch_e0 = e0 - lag(e0)) %>% 
+    ungroup() %>% 
+    filter(!is.na(ch_e0)) %>%
+    select(-e0) %>% 
+    group_by(population, sex) %>% 
+    arrange(year) %>% 
+    nest() %>% 
+    crossing(after_end = 2011:2018) %>% 
+    mutate(
+      bayes_df = map2(
+        after_end, data, ~calc_bayes_factors(after_period = c(2011, .x), before_period = c(1981, 2010), outcome_var = ch_e0, dta = .y)
+      )
+    ) %>% 
+    select(population, sex, after_end, bayes_df) %>% 
+    unnest(cols = c(bayes_df)) %>% 
+    mutate(
+      period = paste0("2011-", str_sub(after_end, 3,4))
+    ) 
+
+bf_uk_nations
+
+```
+
+
+```{r, fig.width = 12, fig.height = 12}
+bf_uk_nations %>% 
+  mutate(perc = 100 * perc) %>% 
+  mutate(
+    population = fct_relevel(population, c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland"))
+  ) %>% 
+  ggplot(aes(x = perc, y = bayes_factor, alpha = period)) +
+  geom_line() + 
+  geom_line(aes(x = perc, y = bayes_factor), size = 1.4, 
+              data = bf_uk_nations %>% 
+                filter(period == "2011-18") %>% 
+                mutate(perc = 100 * perc) %>%
+                mutate(
+    population = fct_relevel(population, c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland"))
+  ) %>% 
+                mutate(is_pos = bayes_factor > 1),
+              inherit.aes = FALSE
+            ) + 
+  facet_wrap(population ~ sex, scales = "free_y") +
+  geom_ribbon(aes(
+      ymin = ifelse(is_pos, 1, bayes_factor), 
+      ymax = ifelse(is_pos, bayes_factor, 1), 
+      x = perc, group = paste0(is_pos, period),
+      fill = is_pos
+    ), 
+              data = bf_uk_nations %>% 
+                mutate(perc = 100 * perc) %>%
+                  mutate(
+              population = fct_relevel(population, c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland"))
+            ) %>% 
+                mutate(is_pos = bayes_factor > 1),
+              inherit.aes = FALSE, alpha = 0.2) + 
+  # scale_y_continuous(limits = c(0.999, 1.008), 
+  #                    breaks = seq(0.999, 1.0080, by = 0.001)
+  #                      
+  #                      ) +
+  scale_alpha_discrete("Period", range = c(0.2, 1), breaks = c("2011-11", "2011-12", "2011-13", "2011-14", "2011-15", "2011-16", "2011-17", "2011-18")) +
+  geom_hline(yintercept = 1) + 
+  labs(
+    x = "Percentage of previous improvement",
+    y = "Bayes Factor\n(>1 means support for Alternative Hypothesis",
+    title = "Bayes Factor for various proposed levels of slowdown",
+    subtitle = "Based on all series up to 2011-18"
+  ) +
+  guides(fill = FALSE) +
+  scale_x_continuous(breaks = seq(0, 100, by = 10))
+
+
+```
+
+For all populations except males in Northern Ireland, the addition of the 2018 single year life expectancy data led to sizeable increases in the empirical support for the belief that there has been a slowdown in life expectancy after 2010; this is seen by noting how much higher the bold line, which incorporates the 2018 data, is than the fainter lines representing cumulative data based on shorter series of observations. For most of these populations, the peak of the bold line is to the left of peaks based on earlier series, meaning not only did the 2018 observations increase the strength of evidence supporting belief in a slowdown in life expectancy improvements, but also suggested more severe magnitudes of slowdown than the series excluding this most recent observation had indicated. For the UK as a whole, the addition of the life expectancy data for 2018 suggested an overall slowdown of around 60% was most likely, compared with a most likely magnitude of slowdown of around 50% based on data up to 2017. 
+For each of these populations, what does the Bayes Factor maximise at? 
+
+```{r}
+bf_uk_nations %>% 
+   filter(period == "2011-18") %>% 
+   mutate(perc = 100 * perc) %>%
+   mutate(
+    population = factor(population, levels = rev(c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland")))
+  ) %>% 
+  group_by(sex, population) %>% 
+  filter(bayes_factor == max(bayes_factor)) %>% 
+  ungroup() %>% 
+  ggplot(aes(y = population, x = 100 - perc, shape = sex, colour = sex)) + 
+  geom_point() + 
+  labs(
+    x = "Percentage decline from 1980-2011 levels",
+    y = "Population", 
+    title = "Estimated percentage decline in life expectancy improvement rates over 2011-2018 compared with 1981-2010"
+  ) +
+  lims(x = c(0, 100))
+
+```
+
+And as a table 
+
+
+```{r}
+bf_uk_nations %>% 
+   filter(period == "2011-18") %>% 
+   mutate(perc = 100 * perc) %>%
+   mutate(
+    population = factor(population, levels = rev(c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland")))
+  ) %>% 
+  group_by(sex, population) %>% 
+  filter(bayes_factor == max(bayes_factor)) %>% 
+  ungroup() %>% 
+  select(population, sex, perc, bayes_factor) %>% 
+  mutate(perc = 100 - perc)  
+  
+
+```
+
+In the UK as a whole, it is most likely that life expectancy improvement rates have slowed down by 62% for females, and 59% for males. This is made up of a 60% (females) and 59% (males) slowdown in England, a 72% (females) and 56% (males) slowdown in Scotland, a 59% (females) and 29% (males) slowdown in Northern Ireland, and an estimated 77% (females) and 83% (males) slowdown in Wales. With the exception of males in Northern Ireland, rates of slowdown are therefore similar across UK nations, and generally slightly more severe for females than males. 
+
+Some important points: 
+
+* This approach means that the process of updating beliefs about the extent and evidence for a slowdown in life expectancy gains can be made formally rather than informally.
+* The Bayes Factor schedules can be recalculated whenever a new data release becomes available. This means that updated schedules can be produced within minutes of the release of official statistics. The commitment to do this each each new release, and to publish updated estimates of support for slowdown, should be made before such data are released. 
+* The tendency within UK populations has been for the rate of slowdown to be increasing over time, rather than to shift suddenly from one rate to another. If this continues then the proposed slowdown percentage that maximises the bayes factor will continue to shift further to the left with additional years' data, and could be maximised at a negative value (i.e. declining life expectancy rather than slowing improvement) if this tendency continues.
+
+
+# International comparison 
+
+Let's look at how the UK compares with a small selection of other nations. For this international comparison, data from the [Human Mortality Database](https://www.mortality.org/) will be used. These data are not as up-to-date as those produced by the ONS in their single year lifetables, and are more out-of-date for some countries than others. 
+
+
+```{r}
+hmd_e0 <- tibble(
+  country = HMDHFDplus::getHMDcountries()
+) %>% 
+  mutate(
+    data = map(country, ~readHMDweb(.x, item = "E0per", this_user, this_pass))
+  ) %>% 
+  unnest(data) %>% 
+  set_names(nm = tolower(names(.))) %>% 
+  gather(key = "sex", value = "e0", female:total)
+
+hmd_e0
+```
+
+
+
+How has life expectancy changed in each of these populations since 1980?
+
+```{r}
+hmd_e0 %>% 
+  filter(sex == "total") %>% 
+  filter(country %in% c("CAN", "USA", "DEUTNP", "NLD", "FRATNP", "GBR_NP", "JPN", "RUS", "NOR", "AUS", "FIN", "ITA")) %>% 
+  group_by(country) %>% 
+  arrange(year) %>% 
+  mutate(ch_e0 = e0 - lag(e0)) %>% 
+  filter(year >= 1980) %>% 
+  ungroup() %>% 
+  mutate(ch_e0 = 52.25 * ch_e0) %>% 
+  ggplot(aes(x = year, y = ch_e0)) +
+  stat_smooth() +
+  geom_point() + geom_line() + 
+  facet_wrap(~country, scales = "free_y") + 
+  geom_hline(yintercept = 0) +
+  labs(
+    x = "Year", y = "Change in life expectancy from previous year (weeks)",
+    title = "Annual change in period life expectancy, selected high income countries",
+    caption = "Source: HMD"
+  )
+
+ggsave(here("figures", "all_countries_hmd.png"), height = 20, width = 28, units = "cm", dpi = 300)
+
+```
+
+This gives some pause for thought. Countries that have seen a slowdown in life expectancy improvement in recent years include:
+
+* The USA (most severe)
+* The UK
+* The Netherlands
+* France
+* Canada
+* Australia
+* Germany (least severe)
+
+Note a difference scale is used for each country, mainly due to the high annual variation in Russia, which saw a sudden decline in life expectancy, of around four years in the years following the collapse of the USSR. With the exception of Russia, and France and Italy in 2003-4 (discussed next), the scales for other populations are quite similar. Note that Italy's population data submitted to the HMD are less recent than for the other European countries, and more up-to-date data may also suggest a slowdown in Italy as well.  
+
+Note also a very high annual increase in life expectancy from 2003-2004, in the following countries:
+
+* France
+* Italy
+* the UK (to a lesser extent)
+* Norway (to a lesser extent)
+* The USA (to a lesser extent)
+
+In France this gain was of around 40 weeks. This appears to correspond to an exceptionally mild winter in 2003-2004, apparently the mildest in around 50 years according to [this paper](https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2004JD005367). It is more than conceivable that this phenomena will lead to some mortality displacement in subsequent years, though I expect any such effect to be transient and not to be sufficient to explain the long-term slowdown observed in the first list of countries above. 
+
+Within [Murphy's LSE Working Paper on mortality trends](http://www.lse.ac.uk/business-and-consultancy/consulting/consulting-reports/stalling-of-mortality-in-the-uk-and-europe), breakpoint analysis was performed for a number of high income countries. This identified a breakpoint of around 2010 in the UK, but around 2005 in some other European countries. (See Figure 4 or report) Further descriptive statistics breaking down mortality change rates by whether the deaths were attributed to cardiovascular disease (i.e. CVD mortality, non-CVD mortality, and total mortality: See Figure 14) also indicated a turning point in cardiovascular disease death rates from 2005 onwards, in France, the Netherlands, and the UK. To the extent that CVD is seasonally patterned and a predominant cause of mortality, and that an outlier value could lead the breakpoint analysis algorithm to split the series into before and after the outlier, it appears conceivable that the finding of a turning point in mortality of around 2005, as identified in a number of European populations, could be in part an artefact of the mild 2003-4 winter. (However, as Figure 14 is not based on a breakpoint analysis, but SDRs alone, and shows that CVD SDR improvement rates have continued to decline for many years post 2005, artefact alone is unlikely to be the main explanation for the series.)
+
+
+
