@@ -1,0 +1,161 @@
+---
+title: "Differences between age components of projections"
+output: html_notebook
+---
+
+# Introduction
+
+The most recent ONS period life expectancy projections for Scotland for 2018 are lower than for 2016, which were lower than for 2014. These overall life expectancy projections are made up of changes to age-specific mortality rate projections, which have also been changed. This short paper will show how these age-specific mortality projections have changed over these last three modifications. 
+
+
+```{r}
+pacman::p_load(here, tidyverse, readxl)
+
+```
+
+From here
+https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/expectationoflifeprincipalprojectionscotland
+
+Downloaded to data/ons_projections/scotland
+
+2018 projection, Scotland 
+https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionscotland%2f2018based/scppp18ex.xls
+
+
+2016 projection, Scotland
+https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionscotland%2f2016based/wscoprincipal16.xls
+
+2014 projection, Scotland
+https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionscotland%2f2014based/wscoprincipal14.xls
+
+2012 projection, Scotland
+https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionscotland%2f2012based/wscoprincipal12exr.xls
+
+
+```{r}
+proj_2018_males <- read_excel(path = here("data", "ons_projections", "scotland", "scppp18ex.xls"),
+                        sheet = "Males period ex", skip = 9
+                          
+                          ) %>% slice(-1) 
+proj_2018_females <- read_excel(path = here("data", "ons_projections", "scotland", "scppp18ex.xls"),
+                        sheet = "Females period ex", skip = 9
+                          
+                          ) %>% slice(-1) 
+
+proj_2016_males <- read_excel(path = here("data", "ons_projections", "scotland", "wscoprincipal16.xls"),
+                        sheet = "Males period ex", skip = 9
+                          
+                          ) %>% slice(-1) 
+proj_2016_females <- read_excel(path = here("data", "ons_projections", "scotland", "wscoprincipal16.xls"),
+                        sheet = "Females period ex", skip = 9
+                          
+                          ) %>% slice(-1) 
+
+proj_2014_males <- read_excel(path = here("data", "ons_projections", "scotland", "wscoprincipal14.xls"),
+                        sheet = "Males period ex", skip = 9
+                          
+                          ) %>% slice(-1) 
+proj_2014_females <- read_excel(path = here("data", "ons_projections", "scotland", "wscoprincipal14.xls"),
+                        sheet = "Females period ex", skip = 9
+                          
+                          ) %>% slice(-1) 
+
+proj_2012_males <- read_excel(path = here("data", "ons_projections", "scotland", "wscoprincipal12exr.xls"),
+                        sheet = "Males Period ex", skip = 10
+                          
+                          ) %>% slice(-1) 
+proj_2012_females <- read_excel(path = here("data", "ons_projections", "scotland", "wscoprincipal12exr.xls"),
+                        sheet = "Females Period ex", skip = 10
+                          
+                          ) %>% slice(-1) 
+
+```
+
+Now tidying, gathering, and combining 
+
+
+```{r}
+all_projections <- bind_rows(
+proj_2012_females %>% 
+  rename(age = `(years)`) %>% 
+  gather(-age, key = "year", value = "ex") %>% 
+  mutate(sex = "female", projection = "2012 projection"),
+proj_2012_males %>% 
+  rename(age = `(years)`) %>% 
+  gather(-age, key = "year", value = "ex") %>% 
+  mutate(sex = "male", projection = "2012 projection"),
+proj_2014_males %>% 
+  rename(age = `Attained age (years)`) %>% 
+  gather(-age, key = "year", value = "ex") %>% 
+  mutate(sex = "male", projection = "2014 projection"),
+proj_2014_females %>% 
+  rename(age = `Attained age (years)`) %>% 
+  gather(-age, key = "year", value = "ex") %>% 
+  mutate(sex = "female", projection = "2014 projection"),
+proj_2016_males %>% 
+  rename(age = `Attained age (years)`) %>% 
+  gather(-age, key = "year", value = "ex") %>% 
+  mutate(sex = "male", projection = "2016 projection"),
+proj_2016_females %>% 
+  rename(age = `Attained age (years)`) %>% 
+  gather(-age, key = "year", value = "ex") %>% 
+  mutate(sex = "female", projection = "2016 projection"),
+proj_2018_males %>% 
+  rename(age = `Attained age (years)`) %>% 
+  gather(-age, key = "year", value = "ex") %>% 
+  mutate(sex = "male", projection = "2018 projection"),
+proj_2018_females %>% 
+  rename(age = `Attained age (years)`) %>% 
+  gather(-age, key = "year", value = "ex") %>% 
+  mutate(sex = "female", projection = "2018 projection")
+) %>% 
+  mutate(year = as.numeric(year))
+all_projections
+
+
+```
+
+
+Now to visualise 
+
+```{r}
+all_projections %>% 
+  filter(age == 0) %>% 
+  filter(year >= 2010) %>% 
+  ggplot(aes(x = year, y = ex, colour = projection, group = projection)) +
+  geom_line() + 
+  facet_wrap(~sex)
+
+```
+
+And now conditional 
+
+```{r, fig.width = 12, fig.height = 10}
+all_projections %>% 
+  filter(year >= 2010) %>% 
+  ggplot(aes(x = year, age, fill = ex)) + 
+  geom_tile() + 
+  facet_grid(sex ~ projection) +
+  scale_fill_distiller(palette = "Paired")
+
+```
+
+And now differences between two consecutive projections 
+
+```{r, fig.width = 12, fig.height = 10}
+all_projections %>% 
+  spread(projection, ex) %>% 
+  mutate(
+    `2012-2014` = `2014 projection` - `2012 projection`,
+    `2014-2016` = `2016 projection` - `2014 projection`,
+    `2016-2018` = `2018 projection` - `2016 projection`
+  ) %>% 
+  select(age, year, sex, `2012-2014`:`2016-2018`) %>% 
+  gather(key = "Comparison", value= "ch_ex", `2012-2014`:`2016-2018`) %>% 
+  filter(year >= 2010) %>% 
+  ggplot(aes(x = year, age, fill = ch_ex)) + 
+  geom_tile() + 
+  facet_grid(sex ~ Comparison) +
+  scale_fill_distiller(palette = "RdBu", limits = c(-1.5, 1.5))
+
+```
