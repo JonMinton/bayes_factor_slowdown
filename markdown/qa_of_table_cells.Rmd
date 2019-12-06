@@ -1,0 +1,238 @@
+---
+title: "QA of numbers in tables in manuscript"
+output: html_notebook
+---
+
+```{r}
+pacman::p_load(tidyverse, here)
+
+```
+
+For table 1
+
+```{r}
+dta_from_1981_to_2028 <- read_csv(here("data", "predictions_to_2028_from1981.csv"))
+
+```
+
+
+And to arrange and paste
+
+```{r}
+# England, Males
+dta_from_1981_to_2028 %>% 
+  filter(population == "England", sex == "male") %>% 
+  select(year, med_pred, low_95, high_95) %>% 
+  t() %>% write.csv("clipboard")
+
+# England, Females
+dta_from_1981_to_2028 %>% 
+  filter(population == "England", sex == "female") %>% 
+  select(year, med_pred, low_95, high_95) %>% 
+  t() %>% write.csv("clipboard")
+
+# Northern Ireland, Males
+dta_from_1981_to_2028 %>% 
+  filter(population == "Northern Ireland", sex == "male") %>% 
+  select(year, med_pred, low_95, high_95) %>% 
+  t() %>% write.csv("clipboard")
+
+
+# Northern Ireland, Females
+dta_from_1981_to_2028 %>% 
+  filter(population == "Northern Ireland", sex == "female") %>% 
+  select(year, med_pred, low_95, high_95) %>% 
+  t() %>% write.csv("clipboard")
+
+# Scotland, Males
+dta_from_1981_to_2028 %>% 
+  filter(population == "Scotland", sex == "male") %>% 
+  select(year, med_pred, low_95, high_95) %>% 
+  t() %>% write.csv("clipboard")
+
+# Scotland, Females
+dta_from_1981_to_2028 %>% 
+  filter(population == "Scotland", sex == "female") %>% 
+  select(year, med_pred, low_95, high_95) %>% 
+  t() %>% write.csv("clipboard")
+
+
+# Wales, Males
+dta_from_1981_to_2028 %>% 
+  filter(population == "Wales", sex == "male") %>% 
+  select(year, med_pred, low_95, high_95) %>% 
+  t() %>% write.csv("clipboard")
+
+
+# Wales, Females
+dta_from_1981_to_2028 %>% 
+  filter(population == "Wales", sex == "female") %>% 
+  select(year, med_pred, low_95, high_95) %>% 
+  t() %>% write.csv("clipboard")
+
+
+# UK, Males
+dta_from_1981_to_2028 %>% 
+  filter(population == "United Kingdom", sex == "male") %>% 
+  select(year, med_pred, low_95, high_95) %>% 
+  t() %>% write.csv("clipboard")
+
+# UK, Females
+dta_from_1981_to_2028 %>% 
+  filter(population == "United Kingdom", sex == "female") %>% 
+  select(year, med_pred, low_95, high_95) %>% 
+  t() %>% write.csv("clipboard")
+
+
+```
+
+This checks out for all except observed life expectancies (which haven't been checked yet). Next for Table 2 (based on 1991onwards instead)
+
+```{r}
+dta_from_1991_to_2028 <- read_csv(here("data", "predictions_to_2028.csv"))
+
+```
+
+
+```{r}
+# England, Males
+dta_from_1991_to_2028 %>% 
+  filter(population == "England", sex == "male") %>% 
+  select(year, med_pred, high_95, low_95) %>% 
+  t() %>% write.csv("clipboard")
+
+# England, Females
+dta_from_1991_to_2028 %>% 
+  filter(population == "England", sex == "female") %>% 
+  select(year, med_pred, high_95, low_95) %>% 
+  t() %>% write.csv("clipboard")
+
+# Northern Ireland, Males
+dta_from_1991_to_2028 %>% 
+  filter(population == "Northern Ireland", sex == "male") %>% 
+  select(year, med_pred, high_95, low_95) %>% 
+  t() %>% write.csv("clipboard")
+
+
+# Northern Ireland, Females
+dta_from_1991_to_2028 %>% 
+  filter(population == "Northern Ireland", sex == "female") %>% 
+  select(year, med_pred, high_95, low_95) %>% 
+  t() %>% write.csv("clipboard")
+
+# Scotland, Males
+dta_from_1991_to_2028 %>% 
+  filter(population == "Scotland", sex == "male") %>% 
+  select(year, med_pred, high_95, low_95) %>% 
+  t() %>% write.csv("clipboard")
+
+# Scotland, Females
+dta_from_1991_to_2028 %>% 
+  filter(population == "Scotland", sex == "female") %>% 
+  select(year, med_pred, high_95, low_95) %>% 
+  t() %>% write.csv("clipboard")
+
+
+# Wales, Males
+dta_from_1991_to_2028 %>% 
+  filter(population == "Wales", sex == "male") %>% 
+  select(year, med_pred, high_95, low_95) %>% 
+  t() %>% write.csv("clipboard")
+
+
+# Wales, Females
+dta_from_1991_to_2028 %>% 
+  filter(population == "Wales", sex == "female") %>% 
+  select(year, med_pred, high_95, low_95) %>% 
+  t() %>% write.csv("clipboard")
+
+
+# UK, Males
+dta_from_1991_to_2028 %>% 
+  filter(population == "United Kingdom", sex == "male") %>% 
+  select(year, med_pred, high_95, low_95) %>% 
+  t() %>% write.csv("clipboard")
+
+# UK, Females
+dta_from_1991_to_2028 %>% 
+  filter(population == "United Kingdom", sex == "female") %>% 
+  select(year, med_pred, high_95, low_95) %>% 
+  t() %>% write.csv("clipboard")
+
+
+```
+
+
+And now the observed values (same for both)
+
+```{r}
+e0 <- read_csv(here("data", "e0_from_ons_allnations.csv"))
+
+```
+
+
+And to paste 
+
+```{r}
+# England, Males
+e0 %>% 
+  filter(between(year, 2012, 2018)) %>% 
+  filter(population == "England", sex == "male") %>% 
+  select(year, e0) %>% write_csv("clipboard")
+
+# England, Females
+e0 %>% 
+  filter(between(year, 2012, 2018)) %>% 
+  filter(population == "England", sex == "female") %>% 
+  select(year, e0) %>% write_csv("clipboard")
+
+# Northern Ireland, Males
+e0 %>% 
+  filter(between(year, 2012, 2018)) %>% 
+  filter(population == "Northern Ireland", sex == "male") %>% 
+  select(year, e0) %>% write_csv("clipboard")
+
+# Northern Ireland, Females
+e0 %>% 
+  filter(between(year, 2012, 2018)) %>% 
+  filter(population == "Northern Ireland", sex == "female") %>% 
+  select(year, e0) %>% write_csv("clipboard")
+
+# Scotland, Males
+e0 %>% 
+  filter(between(year, 2012, 2018)) %>% 
+  filter(population == "Scotland", sex == "male") %>% 
+  select(year, e0) %>% write_csv("clipboard")
+
+# Scotland, Females
+e0 %>% 
+  filter(between(year, 2012, 2018)) %>% 
+  filter(population == "Scotland", sex == "female") %>% 
+  select(year, e0) %>% write_csv("clipboard")
+
+# Wales, Males
+e0 %>% 
+  filter(between(year, 2012, 2018)) %>% 
+  filter(population == "Wales", sex == "male") %>% 
+  select(year, e0) %>% write_csv("clipboard")
+# Wales, Females
+e0 %>% 
+  filter(between(year, 2012, 2018)) %>% 
+  filter(population == "Wales", sex == "female") %>% 
+  select(year, e0) %>% write_csv("clipboard")
+
+# UK, Males
+e0 %>% 
+  filter(between(year, 2012, 2018)) %>% 
+  filter(population == "United Kingdom", sex == "male") %>% 
+  select(year, e0) %>% write_csv("clipboard")
+
+# UK, Females
+e0 %>% 
+  filter(between(year, 2012, 2018)) %>% 
+  filter(population == "United Kingdom", sex == "female") %>% 
+  select(year, e0) %>% write_csv("clipboard")
+
+
+
+```
