@@ -159,3 +159,43 @@ all_projections %>%
   scale_fill_distiller(palette = "RdBu", limits = c(-1.5, 1.5))
 
 ```
+
+I want to check the % change is as expected 
+
+
+```{r}
+all_projections %>% 
+  filter(age == 0) %>% 
+  filter(projection == "2018 projection") %>% 
+  group_by(sex) %>% arrange(year) %>% 
+  mutate(r_e0 = (ex - lag(ex)) / lag(ex)) %>% 
+  filter(year >= 2020) %>% 
+  ggplot(aes(x = year, y = r_e0, colour = sex, group = sex)) + 
+  geom_line()
+
+all_projections %>% 
+  filter(age == 0) %>% 
+  filter(projection == "2018 projection") %>% 
+  group_by(sex) %>% arrange(year) %>% 
+  mutate(d_e0 = ex - lag(ex)) %>% 
+  filter(year >= 2020) %>% 
+  ggplot(aes(x = year, y = d_e0, colour = sex, group = sex)) + 
+  geom_line()
+
+
+```
+
+
+The improvement rates are as applied to individual ages, then e_x is projected from these presumed changes.
+
+But the change in e0 can be approximated from this.
+
+A central and a zero improvement projection have been produced. 
+
+The Bayes Factor for both projections (or the approximate e0 mechanisms implied by them) can be calculated:
+
+* Effect of adding 2018 year to this
+* Recommendation to do this for next year too.
+* Rapid downgrading of last few successive mortality projections suggests an approach more responsive to new evidence may be needed. 
+
+
