@@ -8,27 +8,142 @@ output:
     warning: false
 ---
 
-# Introduction 
+# Prep preamble 
 
-This document will calculate Bayes Factors based on UK nation datas from the ONS.
-
-```{r}
+```{r, echo = FALSE}
 pacman::p_load(tidyverse, here, changepoint, segmented, ggrepel, knitr, kableExtra, HMDHFDplus)
 
 ```
 
-```{r}
+```{r, echo = FALSE}
 source(here("scripts", "load_packages_and_functions.R"))
 
 ```
 
-```{r}
+```{r, echo = FALSE}
 write_to_table <- function(x, loc){
   write_csv(x, loc)
   x
 }
 
 ```
+
+
+
+# Introduction/structure
+
+The analyses promised are the following, in the following order: 
+
+1. Annual change rates in life expectancy in the UK as compared with a number of other high income countries. 
+2. Annual change rates in life expectancy in the UK as a whole and UK nations or groups of nations + change point analyses
+    2a. Life expectancy change rates
+    2b. Changepoint analysis
+3. ONS life expectancy projections from 2012 onwards, to show how these have been successively downrated with each biennial projection
+4. Bayes Factors for $e_0$ changes since 2010 assuming different rates of slowdown expressed as a % of average prior change 
+5. Average improvment rates for $e_0$ implied by each ONS projection, to quantify how optimistic/pessimistic each of the projections has been compared with post 2010 trends
+
+Let's reorganise this material to better reflect the proposed order in the paper. 
+
+# 1 Annual rates of change internationally 
+
+## Data 
+
+The data used were $e_0$ from the [Human Mortality Database](https://www.mortality.org/). 
+
+The data were extracted using the `HMDHFDplus` package. 
+
+## Results 
+
+```{r get_e0_hmd, echo = FALSE}
+hmd_e0 <- tibble(
+  country = HMDHFDplus::getHMDcountries()
+) %>% 
+  mutate(
+    data = map(country, ~readHMDweb(.x, item = "E0per", this_user, this_pass))
+  ) %>% 
+  unnest(data) %>% 
+  set_names(nm = tolower(names(.))) %>% 
+  gather(key = "sex", value = "e0", female:total)
+
+hmd_e0
+
+
+```
+
+
+Let's label the countries and pick out only mutually exclusive populations 
+
+```{r}
+
+
+```
+# International comparison 
+
+Let's look at how the UK compares with a small selection of other nations. For this international comparison, data from the [Human Mortality Database] will be used. These data are not as up-to-date as those produced by the ONS in their single year lifetables, and are more out-of-date for some countries than others. 
+
+
+```{r}
+```
+
+
+
+How has life expectancy changed in each of these populations since 1980?
+
+```{r}
+hmd_e0 %>% 
+  filter(sex == "total") %>% 
+  filter(country %in% c("CAN", "USA", "DEUTNP", "NLD", "FRATNP", "GBR_NP", "JPN", "RUS", "NOR", "AUS", "FIN", "ITA")) %>% 
+  group_by(country) %>% 
+  arrange(year) %>% 
+  mutate(ch_e0 = e0 - lag(e0)) %>% 
+  filter(year >= 1980) %>% 
+  ungroup() %>% 
+  mutate(ch_e0 = 52.25 * ch_e0) %>% 
+  ggplot(aes(x = year, y = ch_e0)) +
+  stat_smooth() +
+  geom_point() + geom_line() + 
+  facet_wrap(~country, scales = "free_y") + 
+  geom_hline(yintercept = 0) +
+  labs(
+    x = "Year", y = "Change in life expectancy from previous year (weeks)",
+    title = "Annual change in period life expectancy, selected high income countries",
+    caption = "Source: HMD"
+  )
+
+ggsave(here("figures", "all_countries_hmd.png"), height = 20, width = 28, units = "cm", dpi = 300)
+
+```
+
+This gives some pause for thought. Countries that have seen a slowdown in life expectancy improvement in recent years include:
+
+* The USA (most severe)
+* The UK
+* The Netherlands
+* France
+* Canada
+* Australia
+* Germany (least severe)
+
+Note a difference scale is used for each country, mainly due to the high annual variation in Russia, which saw a sudden decline in life expectancy, of around four years in the years following the collapse of the USSR. With the exception of Russia, and France and Italy in 2003-4 (discussed next), the scales for other populations are quite similar. Note that Italy's population data submitted to the HMD are less recent than for the other European countries, and more up-to-date data may also suggest a slowdown in Italy as well.  
+
+Note also a very high annual increase in life expectancy from 2003-2004, in the following countries:
+
+* France
+* Italy
+* the UK (to a lesser extent)
+* Norway (to a lesser extent)
+* The USA (to a lesser extent)
+
+In France this gain was of around 40 weeks. This appears to correspond to an exceptionally mild winter in 2003-2004, apparently the mildest in around 50 years according to [this paper](https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2004JD005367). It is more than conceivable that this phenomena will lead to some mortality displacement in subsequent years, though I expect any such effect to be transient and not to be sufficient to explain the long-term slowdown observed in the first list of countries above. 
+
+Within [Murphy's LSE Working Paper on mortality trends](http://www.lse.ac.uk/business-and-consultancy/consulting/consulting-reports/stalling-of-mortality-in-the-uk-and-europe), breakpoint analysis was performed for a number of high income countries. This identified a breakpoint of around 2010 in the UK, but around 2005 in some other European countries. (See Figure 4 or report) Further descriptive statistics breaking down mortality change rates by whether the deaths were attributed to cardiovascular disease (i.e. CVD mortality, non-CVD mortality, and total mortality: See Figure 14) also indicated a turning point in cardiovascular disease death rates from 2005 onwards, in France, the Netherlands, and the UK. To the extent that CVD is seasonally patterned and a predominant cause of mortality, and that an outlier value could lead the breakpoint analysis algorithm to split the series into before and after the outlier, it appears conceivable that the finding of a turning point in mortality of around 2005, as identified in a number of European populations, could be in part an artefact of the mild 2003-4 winter. (However, as Figure 14 is not based on a breakpoint analysis, but SDRs alone, and shows that CVD SDR improvement rates have continued to decline for many years post 2005, artefact alone is unlikely to be the main explanation for the series.)
+
+
+
+# Introduction 
+
+This document will calculate Bayes Factors based on UK nation datas from the ONS.
+
 
 
 # Load data 
@@ -434,78 +549,6 @@ Some important points:
 * The Bayes Factor schedules can be recalculated whenever a new data release becomes available. This means that updated schedules can be produced within minutes of the release of official statistics. The commitment to do this each each new release, and to publish updated estimates of support for slowdown, should be made before such data are released. 
 * The tendency within UK populations has been for the rate of slowdown to be increasing over time, rather than to shift suddenly from one rate to another. If this continues then the proposed slowdown percentage that maximises the bayes factor will continue to shift further to the left with additional years' data, and could be maximised at a negative value (i.e. declining life expectancy rather than slowing improvement) if this tendency continues.
 
-
-# International comparison 
-
-Let's look at how the UK compares with a small selection of other nations. For this international comparison, data from the [Human Mortality Database](https://www.mortality.org/) will be used. These data are not as up-to-date as those produced by the ONS in their single year lifetables, and are more out-of-date for some countries than others. 
-
-
-```{r}
-hmd_e0 <- tibble(
-  country = HMDHFDplus::getHMDcountries()
-) %>% 
-  mutate(
-    data = map(country, ~readHMDweb(.x, item = "E0per", this_user, this_pass))
-  ) %>% 
-  unnest(data) %>% 
-  set_names(nm = tolower(names(.))) %>% 
-  gather(key = "sex", value = "e0", female:total)
-
-hmd_e0
-```
-
-
-
-How has life expectancy changed in each of these populations since 1980?
-
-```{r}
-hmd_e0 %>% 
-  filter(sex == "total") %>% 
-  filter(country %in% c("CAN", "USA", "DEUTNP", "NLD", "FRATNP", "GBR_NP", "JPN", "RUS", "NOR", "AUS", "FIN", "ITA")) %>% 
-  group_by(country) %>% 
-  arrange(year) %>% 
-  mutate(ch_e0 = e0 - lag(e0)) %>% 
-  filter(year >= 1980) %>% 
-  ungroup() %>% 
-  mutate(ch_e0 = 52.25 * ch_e0) %>% 
-  ggplot(aes(x = year, y = ch_e0)) +
-  stat_smooth() +
-  geom_point() + geom_line() + 
-  facet_wrap(~country, scales = "free_y") + 
-  geom_hline(yintercept = 0) +
-  labs(
-    x = "Year", y = "Change in life expectancy from previous year (weeks)",
-    title = "Annual change in period life expectancy, selected high income countries",
-    caption = "Source: HMD"
-  )
-
-ggsave(here("figures", "all_countries_hmd.png"), height = 20, width = 28, units = "cm", dpi = 300)
-
-```
-
-This gives some pause for thought. Countries that have seen a slowdown in life expectancy improvement in recent years include:
-
-* The USA (most severe)
-* The UK
-* The Netherlands
-* France
-* Canada
-* Australia
-* Germany (least severe)
-
-Note a difference scale is used for each country, mainly due to the high annual variation in Russia, which saw a sudden decline in life expectancy, of around four years in the years following the collapse of the USSR. With the exception of Russia, and France and Italy in 2003-4 (discussed next), the scales for other populations are quite similar. Note that Italy's population data submitted to the HMD are less recent than for the other European countries, and more up-to-date data may also suggest a slowdown in Italy as well.  
-
-Note also a very high annual increase in life expectancy from 2003-2004, in the following countries:
-
-* France
-* Italy
-* the UK (to a lesser extent)
-* Norway (to a lesser extent)
-* The USA (to a lesser extent)
-
-In France this gain was of around 40 weeks. This appears to correspond to an exceptionally mild winter in 2003-2004, apparently the mildest in around 50 years according to [this paper](https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2004JD005367). It is more than conceivable that this phenomena will lead to some mortality displacement in subsequent years, though I expect any such effect to be transient and not to be sufficient to explain the long-term slowdown observed in the first list of countries above. 
-
-Within [Murphy's LSE Working Paper on mortality trends](http://www.lse.ac.uk/business-and-consultancy/consulting/consulting-reports/stalling-of-mortality-in-the-uk-and-europe), breakpoint analysis was performed for a number of high income countries. This identified a breakpoint of around 2010 in the UK, but around 2005 in some other European countries. (See Figure 4 or report) Further descriptive statistics breaking down mortality change rates by whether the deaths were attributed to cardiovascular disease (i.e. CVD mortality, non-CVD mortality, and total mortality: See Figure 14) also indicated a turning point in cardiovascular disease death rates from 2005 onwards, in France, the Netherlands, and the UK. To the extent that CVD is seasonally patterned and a predominant cause of mortality, and that an outlier value could lead the breakpoint analysis algorithm to split the series into before and after the outlier, it appears conceivable that the finding of a turning point in mortality of around 2005, as identified in a number of European populations, could be in part an artefact of the mild 2003-4 winter. (However, as Figure 14 is not based on a breakpoint analysis, but SDRs alone, and shows that CVD SDR improvement rates have continued to decline for many years post 2005, artefact alone is unlikely to be the main explanation for the series.)
 
 
 
