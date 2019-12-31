@@ -10,17 +10,17 @@ output:
 
 # Prep preamble 
 
-```{r, echo = FALSE}
-pacman::p_load(tidyverse, here, changepoint, segmented, ggrepel, knitr, kableExtra, HMDHFDplus, corrr)
+```{r, echo = FALSE, warning = FALSE}
+pacman::p_load(tidyverse, here, changepoint, segmented, ggrepel, knitr, kableExtra, HMDHFDplus, corrr, readxl)
 
 ```
 
-```{r, echo = FALSE}
+```{r, echo = FALSE, warning = FALSE}
 source(here("scripts", "load_packages_and_functions.R"))
 
 ```
 
-```{r, echo = FALSE}
+```{r, echo = FALSE, warning = FALSE}
 write_to_table <- function(x, loc){
   write_csv(x, loc)
   x
@@ -54,7 +54,7 @@ The data were extracted using the `HMDHFDplus` package.
 
 ## 1.2 Results 
 
-```{r get_e0_hmd, echo = FALSE, cache = TRUE}
+```{r get_e0_hmd, echo = FALSE, cache = TRUE, eval = FALSE, warning = FALSE}
 hmd_e0 <- tibble(
   country = HMDHFDplus::getHMDcountries()
 ) %>% 
@@ -67,13 +67,20 @@ hmd_e0 <- tibble(
 
 hmd_e0
 
+hmd_e0 %>% 
+  write_csv(here("data", "e0_hmd.csv"))
+```
+
+The above should just be done once. Once extracted and saved, it should be loaded
+
+```{r, warning = FALSE, echo = FALSE}
+hmd_e0 <- read_csv(here("data", "e0_hmd.csv"))
 
 ```
 
-
 Let's label the countries and pick out only mutually exclusive populations. The code lookups are [here](https://www.mortality.org/Public/HMD-countries-codes.pdf)
 
-```{r}
+```{r, warning = FALSE}
 code_lookup <- tribble(
   ~code,    ~label,                      ~include, 
   "AUS",     "Australia",                  1, 
@@ -131,7 +138,7 @@ code_lookup <- tribble(
 
 
 
-```{r}
+```{r, warning = FALSE}
 #Are any codes not matched?
 hmd_e0 %>% 
   left_join(code_lookup, by = c("country" = "code")) %>% 
@@ -158,7 +165,7 @@ hmd_e0 %>%
 
 For all mutually exclusive countries in the HMD with data since 1990 onwards, the following shows how annual life expectancy has changed over time 
 
-```{r, echo = FALSE}
+```{r, echo = FALSE, warning = FALSE}
 
 ch_e0_from1990_hmd <- 
   hmd_e0 %>% 
@@ -186,7 +193,7 @@ ch_e0_from1990_hmd %>%
 
 ### 1.2.1.1 Figure of HMD Average change in $e_0$ by decade
 
-```{r echo=FALSE, fig.height=10, fig.width=10}
+```{r echo=FALSE, fig.height=10, fig.width=10, warning = FALSE}
 
 mean_ch_e0_decade_hmd <- 
   ch_e0_from1990_hmd %>% 
@@ -231,7 +238,7 @@ ggsave(here("figures", "mean_ch_e0_decade.png"), height = 30, width = 30, units 
 ### 1.2.1.2 Table of HMD Average change in $e_0$ by decade
 
 
-```{r}
+```{r, warning = FALSE}
 mean_ch_e0_decade_hmd <- 
   ch_e0_from1990_hmd %>% 
     filter(!is.na(ch_e0)) %>% 
@@ -277,7 +284,7 @@ The similarity between average rates of improvement in the 2010s in Germany and 
 
 There are some important differences, however, in how annual change rates have varied in the the slowest-improving countries. Figure X shows this for the five slowest-improving countries excluding Iceland, which due to its small population size shows much greater levels of annual variability than the other countries. From this figure it is apparent that the USA not only tended to show lower rates of improvement before 2010, but has also been exhibiting continuing and more persistent declines than the other countries, with three consecutive years of declining mortality for males in the last three available years, and only modest improvements for females.   
 
-```{r echo=FALSE, fig.height=8, fig.width=8}
+```{r echo=FALSE, fig.height=8, fig.width=8, warning = FALSE}
 ch_e0_from1990_hmd %>% 
   filter(sex != "total") %>% 
   filter(country %in% c("DEUTNP", "NLD", "USA", "GBR_NP")) %>% 
@@ -319,7 +326,7 @@ The following code will not be run, as the data have already been extracted. How
 
 First, defining the files to extract lifetables from.
 
-```{r, echo = FALSE, eval = FALSE}
+```{r, echo = FALSE, eval = FALSE, warning = FALSE}
 
 ons_lifetables <- tribble(
   ~population, ~file_location,
@@ -335,7 +342,7 @@ ons_lifetables <- tribble(
 
 Then, defining a function to clean the data from the worksheets in the workbooks.
 
-```{r fn_clean_data, echo = FALSE, eval = FALSE}
+```{r fn_clean_data, echo = FALSE, eval = FALSE, warning = FALSE}
 
 clean_data <- function(X){
   out <- X %>% 
@@ -349,7 +356,7 @@ clean_data <- function(X){
 
 Now, getting the $m_x$ data.
 
-```{r fn_get_mx_data, echo = FALSE, eval = FALSE}
+```{r fn_get_mx_data, echo = FALSE, eval = FALSE, warning = FALSE}
 get_mx_data <- function(path){
   tibble(
     year = as.character(1980:2018)
@@ -389,7 +396,7 @@ ons_lifetables
 From this it's very easy to extract $e_0$ alone.
 
 
-```{r, eval = FALSE, echo = FALSE}
+```{r, eval = FALSE, echo = FALSE, warning = FALSE}
 ons_e0 <- 
   ons_lifetables %>% 
     filter(x == 0) %>% 
@@ -402,7 +409,7 @@ write_csv(ons_e0, here("data", "e0_from_ons_allnations.csv"))
 
 To save on this, let's just load the tidied $e_0$ data
 
-```{r}
+```{r, warning = FALSE}
 dta_e0 <- read_csv(here("data", "e0_from_ons_allnations.csv"))
 dta_e0
 ```
@@ -415,7 +422,7 @@ dta_e0
 
 Visualise the life expectancy and change in life expectancy for each year 
 
-```{r, fig.width = 12, fig.height = 12, echo = FALSE}
+```{r, fig.width = 12, fig.height = 12, echo = FALSE, warning = FALSE}
 dta_e0 %>% 
   group_by(population, sex) %>% 
   arrange(year) %>% 
@@ -447,7 +454,7 @@ From the above it seems most populations have seen a slowdown in improvement in 
 
 As before, let's look at the average improvement per decade. This will allow us to compare the UK rates from the ONS against those in the HMD. 
 
-```{r}
+```{r, warning = FALSE}
 ons_ch_e0_decade <- 
   dta_e0 %>% 
     group_by(population, sex) %>% 
@@ -490,7 +497,7 @@ As expected, the ONS and HMD estimates of mean improvement per decade are closel
 
 Let's now present this as a barplot 
 
-```{r}
+```{r, warning = FALSE}
 ons_ch_e0_decade %>% 
   filter(population %in% c("United Kingdom", "Wales", "Scotland", "England", "Northern Ireland")) %>% 
   left_join(
@@ -525,7 +532,7 @@ For each UK nation, the 2000s had exceptionally high rates of improvement. By co
 #### 2.2.3.1 Change in life expectancy in mutually exclusive UK nations - faceted
 
 
-```{r, fig.width = 12, fig.height = 12, echo = FALSE}
+```{r, fig.width = 12, fig.height = 12, echo = FALSE, warning = FALSE}
 
 dta_e0 %>% 
   filter(population %in% c("England", "Wales", "Scotland", "Northern Ireland")) %>% 
@@ -557,7 +564,7 @@ ggsave(here("figures", "annual_e0_ch_all_DISTINCT_uknations_ons.png"), height = 
 #### 2.2.3.2 Change in life expectancy in mutually exclusive UK nations - overlaid
 
 
-```{r, fig.width = 12, fig.height = 8, echo = FALSE}
+```{r, fig.width = 12, fig.height = 8, echo = FALSE, warning = FALSE}
 
 dta_e0 %>% 
   filter(population %in% c("England", "Wales", "Scotland", "Northern Ireland")) %>% 
@@ -587,7 +594,7 @@ ggsave(here("figures", "annual_e0_ch_all_DISTINCT_uknations_ons_overlaid.png"), 
 
 There are clear similarities between the trends in each of the UK nations, again with the exception of Northern Ireland. The trends even seem to correspond in terms of which years are 'good years' and which years are 'bad years' (i.e. they oscillate in phase with each other). To check this let's look at the correlation between the trends 
 
-```{r}
+```{r, warning = FALSE}
 corrs_trends <- 
   dta_e0 %>% 
     filter(population %in% c("England", "Wales", "Scotland", "Northern Ireland")) %>% 
@@ -622,36 +629,11 @@ This suggests that any general trends which apply throughout the UK will apply l
 ### 2.2.4 Breakpoint analysis
 
 
-Let's now explore the slowdown by running breakpoint analysis 
+The following section will perform breakpoint analysis using the `segmented` package for each UK nation as well as the UK as a whole. 
 
-```{r}
-dta_e0 %>% 
-  group_by(population, sex) %>% 
-  arrange(year) %>% 
-  mutate(ch_e0 = e0 - lag(e0)) %>% 
-  ungroup() %>% 
-  filter(!is.na(ch_e0)) %>% 
-  select(-e0) %>% 
-  mutate(pop_sex = paste(population, sex, sep = "_")) %>% 
-  select(pop_sex, year, ch_e0) %>% 
-  filter(pop_sex == "United Kingdom_female") %>% 
-  pull(ch_e0) %>%  
-  cpt.mean() %>% plot()
+First we look to see if two and three breakpoints can be identified in any of the populations. 
 
-# %>% 
-#   spread(pop_sex, ch_e0) %>% (function(x){
-#     tmp <- x %>% pull(year)
-#     mtrx <- as.matrix(x %>% select(-year)) 
-#     row.names(mtrx) <- tmp
-#     mtrx %>% t()
-#   }) %>% 
-#   cpt.mean(penalty = "None", Q = 2) -> cpts
-
-```
-
-How about package `segmented` instead? This might be more appropriate as the change is apparently gradual rather than discrete 
-
-```{r}
+```{r, echo = TRUE, warning = FALSE}
 
 datablocks <- 
   dta_e0 %>% 
@@ -688,10 +670,11 @@ for (i in 1:14){
 # segmented::segmented()
 
 ```
+In many cases, breakpoints cannot be identified. However this may be if multiple breakpoints are being attempted, but not all can be estimated. We are mainly interested in whether there's been a single breakpoint, and whether this has been identified consistently in all populations. 
 
-let's do the above but with five different seeds for a single breakpoint model 
+To investigate this, let's explore whether the same single breakpoint can be consistently identified. We can do that by checking whether the choice of random number seed matters.
 
-```{r}
+```{r, warning = FALSE}
 segmods1brk_seed01 <- vector(mode = "list", length = 14)
 segmods1brk_seed02 <- vector(mode = "list", length = 14)
 segmods1brk_seed03 <- vector(mode = "list", length = 14)
@@ -715,10 +698,11 @@ for (i in 1:14){
 
 ```
 
+Note that consecutive random numbers cannot be used, as for some random numbers (4, 5 and 7 in this case) breakpoints cannot be identified.
 
 Let's pull the 1 breakpoint estimates 
 
-```{r}
+```{r, warning = FALSE}
 get_brks <- function(x){
   tryCatch(summary(x)$psi[,2], finally = NULL)
 }
@@ -741,9 +725,12 @@ datablocks %>%
 
 This shows that 1 breakpoint models can be identified for each population, but 2 and 3 breakpoint models only for some populations. For almost all populations, except Northern Ireland, the breakpoint is identified as around 2009 (so the change from 2009 to 2010)
 
-Let's extract the 1 breakpoint models and standard errors, and present these 
+#### 2.2.4.1 Breakpoint figure
 
-```{r}
+The following shows the breakpoints and standard errors.
+
+
+```{r, warning = FALSE}
 datablocks %>% 
   ungroup() %>% 
   mutate(
@@ -775,13 +762,125 @@ datablocks %>%
   
   ) + 
   theme_light()
+
+ggsave(here("figures", "breakpoint_uk_allgroups.png"), height = 15, width = 25, units = "cm", dpi = 300)
 ```
+
+#### 2.2.4.2 Breakpoint table
 
 This shows a lot of consistency in estimates of when the breakdown occurred. With the exception of Northern Ireland, we can use 2010 afterwards as 'post-slowdown', and the years from 1980 onwards as 'pre-slowdown'.
 
+```{r, warning = FALSE}
+datablocks %>% 
+  ungroup() %>% 
+  mutate(
+    segmod_1brk  = segmods_1brk
+  ) %>% 
+  mutate(
+    brk_year = map_dbl(segmod_1brk, ~summary(.x)$psi[2]),
+    brk_se   = map_dbl(segmod_1brk, ~summary(.x)$psi[3])
+  ) %>% 
+  select(population, sex, brk_year, brk_se) %>% 
+  mutate(
+    brk_lwr = brk_year - 2 * brk_se, 
+    brk_upr = brk_year + 2 * brk_se
+  ) %>% 
+  mutate(
+    population = fct_relevel(population, rev(c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland")))
+  ) %>% 
+  rename(
+    Population = population,
+    Sex = sex, 
+    Breakpoint = brk_year, 
+    SE         = brk_se,
+    `Lower CI` = brk_lwr, `Upper CI` = brk_upr
+  ) %>% 
+  mutate_if(is.numeric, ~round(., 2)) %>% 
+  kable() %>% 
+  kable_styling() 
+```
+
+#### 2.2.4.3 Breakpoint figure - mutually exclusive UK nations
+
+The following shows the breakpoints and standard errors.
+
+
+```{r, warning = FALSE, echo = FALSE}
+datablocks %>% 
+  ungroup() %>% 
+  mutate(
+    segmod_1brk  = segmods_1brk
+  ) %>% 
+  mutate(
+    brk_year = map_dbl(segmod_1brk, ~summary(.x)$psi[2]),
+    brk_se   = map_dbl(segmod_1brk, ~summary(.x)$psi[3])
+  ) %>% 
+  select(population, sex, brk_year, brk_se) %>% 
+  mutate(
+    brk_lwr = brk_year - 2 * brk_se, 
+    brk_upr = brk_year + 2 * brk_se
+  ) %>% 
+  filter(population %in% c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")) %>% 
+  mutate(
+    population = fct_relevel(population, rev(c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")))
+  ) %>% 
+  ggplot(aes(x = brk_year, y = population)) + 
+  geom_point() + 
+  geom_errorbarh(aes(xmin = brk_lwr, xmax=brk_upr), height = 0.2) + 
+  facet_wrap(~sex) + 
+  geom_vline(xintercept = 2018) + 
+  labs(
+    x = "Year", 
+    y = "Population",
+    title = "Estimates of breakpoint years from one breakpoint models",
+    subtitle = "Error bars show two standard errors around estimate",
+    caption = "Source: ONS Single Year Lifetables"
+  
+  ) + 
+  theme_light()
+
+ggsave(here("figures", "breakpoint_uk_allcountries.png"), height = 15, width = 25, units = "cm", dpi = 300)
+```
+
+#### 2.2.4.2 Breakpoint table
+
+This shows a lot of consistency in estimates of when the breakdown occurred. With the exception of Northern Ireland, we can use 2010 afterwards as 'post-slowdown', and the years from 1980 onwards as 'pre-slowdown'.
+
+```{r, warning = FALSE, echo = FALSE}
+datablocks %>% 
+  ungroup() %>% 
+  mutate(
+    segmod_1brk  = segmods_1brk
+  ) %>% 
+  mutate(
+    brk_year = map_dbl(segmod_1brk, ~summary(.x)$psi[2]),
+    brk_se   = map_dbl(segmod_1brk, ~summary(.x)$psi[3])
+  ) %>% 
+  select(population, sex, brk_year, brk_se) %>% 
+  mutate(
+    brk_lwr = brk_year - 2 * brk_se, 
+    brk_upr = brk_year + 2 * brk_se
+  ) %>% 
+  mutate(
+    population = fct_relevel(population, rev(c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland")))
+  ) %>% 
+  rename(
+    Population = population,
+    Sex = sex, 
+    Breakpoint = brk_year, 
+    SE         = brk_se,
+    `Lower CI` = brk_lwr, `Upper CI` = brk_upr
+  ) %>% 
+  mutate_if(is.numeric, ~round(., 2)) %>% 
+  kable() %>% 
+  kable_styling() 
+```
+
+#### 2.2.4.2 Effect of different random number seeds on breakpoint
+
 Let's do the same for the five one breakpoint models using different seeds 
 
-```{r}
+```{r, warning = FALSE, echo = FALSE}
 datablocks %>% 
   ungroup() %>% 
   mutate(
@@ -802,22 +901,218 @@ datablocks %>%
   facet_wrap(~sex)
   
 
-# %>% 
-#   mutate(
-#     brk_year = map_dbl(segmod_1brk, ~summary(.x)$psi[2]),
-#     brk_se   = map_dbl(segmod_1brk, ~summary(.x)$psi[3])
-#   ) %>% 
-#   select(population, sex, brk_year, brk_se) %>% 
-#   mutate(
-#     brk_lwr = brk_year - 2 * brk_se, 
-#     brk_upr = brk_year + 2 * brk_se
-#   ) %>% 
-#   mutate(
-#     population = fct_relevel(population, rev(c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland")))
-#   ) 
-
 ```
 Break point years, where they can be calculated, are largely identical. They confirm 2010 as a reasonable breakpoint year except for Northern Ireland. 
+
+3. ONS life expectancy projections from 2012 onwards, to show how these have been successively downrated with each biennial projection
+
+# 3 ONS life expectancy projections 
+
+The ONS modifies their estimates of life expectancy every couple of years as part of their population projections exercise. For the last four projections the life expectancy projections have been downgraded. This section will show how projections have changed over time, and how they compare against observed life expectancy. 
+
+## 3.1 Data 
+
+For Scotland, the data for the projections are made available at [this location](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/expectationoflifeprincipalprojectionscotland
+) on the ONS website: 
+
+The specific projections are available at the following locations: 
+
+* [2018 projection for Scotland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionscotland%2f2018based/scppp18ex.xls) 
+* [2016 projection for Scotland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionscotland%2f2016based/wscoprincipal16.xls) 
+* [2014 projection for Scotland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionscotland%2f2014based/wscoprincipal14.xls)
+* [2012 projection for Scotland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionscotland%2f2012based/wscoprincipal12exr.xls)
+
+For England, the projections are [available here](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/expectationoflifeprincipalprojectionengland).
+
+* [2018 projection for England](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionengland%2f2018based/engppp18ex.xls)
+* [2016 projection for England](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionengland%2f2016based/wengprincipal16.xls)
+* [2014 projection for England](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionengland%2f2014based/wengprincipal14.xls)
+* [2012 projection for England](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionengland%2f2012based/wengprincipal12.xls)
+
+
+For Wales, the projections are [available here](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/expectationoflifeprincipalprojectionwales).
+
+* [2018 projection for Wales](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2018based/walppp18ex.xls)
+* [2016 projection for Wales](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2016based/wwalprincipal16.xls)
+* [2014 projection for Wales](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2016based/wwalprincipal14.xls)
+* [2012 projection for Wales](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2012based/wwalprincipal12.xls) 
+
+For Northern Ireland, the projections are [available here](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/expectationoflifeprincipalprojectionnorthernireland)
+
+* [2018 projection for Northern Ireland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionnorthernireland%2f2018based/nippp18ex.xls)
+* [2016 projection for Northern Ireland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionnorthernireland%2f2016based/wniprincipal16.xls)
+* [2014 projection for Northern Ireland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionnorthernireland%2f2014based/wniprincipal14.xls)
+* [2012 projection for Northern Ireland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionnorthernireland%2f2012based/wniprincipal12.xls)
+
+
+The for United Kingdom, the projections are [available here](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/expectationoflifeprincipalprojectionunitedkingdom)
+
+* [2018 projection for United Kingdom](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionunitedkingdom%2f2018based/ukppp18ex.xls)
+* [2016 projection for United Kingdom](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionunitedkingdom%2f2016based/wukprincipal16.xls)
+* [2014 projection for United Kingdom](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionunitedkingdom%2f2014based/wukprincipal14.xls)
+* [2012 projection for United Kingdom](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionunitedkingdom%2f2012based/wukprincipal12exr.xls)
+
+*TO DO*
+
+* Download all of the above and load and tidy them
+
+```{r}
+proj_2018_males <- read_excel(path = here("data", "ons_projections", "scotland", "scppp18ex.xls"),
+                        sheet = "Males period ex", skip = 9
+                          
+                          ) %>% slice(-1) 
+proj_2018_females <- read_excel(path = here("data", "ons_projections", "scotland", "scppp18ex.xls"),
+                        sheet = "Females period ex", skip = 9
+                          
+                          ) %>% slice(-1) 
+
+proj_2016_males <- read_excel(path = here("data", "ons_projections", "scotland", "wscoprincipal16.xls"),
+                        sheet = "Males period ex", skip = 9
+                          
+                          ) %>% slice(-1) 
+proj_2016_females <- read_excel(path = here("data", "ons_projections", "scotland", "wscoprincipal16.xls"),
+                        sheet = "Females period ex", skip = 9
+                          
+                          ) %>% slice(-1) 
+
+proj_2014_males <- read_excel(path = here("data", "ons_projections", "scotland", "wscoprincipal14.xls"),
+                        sheet = "Males period ex", skip = 9
+                          
+                          ) %>% slice(-1) 
+proj_2014_females <- read_excel(path = here("data", "ons_projections", "scotland", "wscoprincipal14.xls"),
+                        sheet = "Females period ex", skip = 9
+                          
+                          ) %>% slice(-1) 
+
+proj_2012_males <- read_excel(path = here("data", "ons_projections", "scotland", "wscoprincipal12exr.xls"),
+                        sheet = "Males Period ex", skip = 10
+                          
+                          ) %>% slice(-1) 
+proj_2012_females <- read_excel(path = here("data", "ons_projections", "scotland", "wscoprincipal12exr.xls"),
+                        sheet = "Females Period ex", skip = 10
+                          
+                          ) %>% slice(-1) 
+
+```
+
+Now tidying, gathering, and combining 
+
+
+```{r}
+all_projections <- bind_rows(
+proj_2012_females %>% 
+  rename(age = `(years)`) %>% 
+  gather(-age, key = "year", value = "ex") %>% 
+  mutate(sex = "female", projection = "2012 projection"),
+proj_2012_males %>% 
+  rename(age = `(years)`) %>% 
+  gather(-age, key = "year", value = "ex") %>% 
+  mutate(sex = "male", projection = "2012 projection"),
+proj_2014_males %>% 
+  rename(age = `Attained age (years)`) %>% 
+  gather(-age, key = "year", value = "ex") %>% 
+  mutate(sex = "male", projection = "2014 projection"),
+proj_2014_females %>% 
+  rename(age = `Attained age (years)`) %>% 
+  gather(-age, key = "year", value = "ex") %>% 
+  mutate(sex = "female", projection = "2014 projection"),
+proj_2016_males %>% 
+  rename(age = `Attained age (years)`) %>% 
+  gather(-age, key = "year", value = "ex") %>% 
+  mutate(sex = "male", projection = "2016 projection"),
+proj_2016_females %>% 
+  rename(age = `Attained age (years)`) %>% 
+  gather(-age, key = "year", value = "ex") %>% 
+  mutate(sex = "female", projection = "2016 projection"),
+proj_2018_males %>% 
+  rename(age = `Attained age (years)`) %>% 
+  gather(-age, key = "year", value = "ex") %>% 
+  mutate(sex = "male", projection = "2018 projection"),
+proj_2018_females %>% 
+  rename(age = `Attained age (years)`) %>% 
+  gather(-age, key = "year", value = "ex") %>% 
+  mutate(sex = "female", projection = "2018 projection")
+) %>% 
+  mutate(year = as.numeric(year))
+all_projections
+
+
+```
+
+
+Now to visualise 
+
+```{r}
+all_projections %>% 
+  filter(age == 0) %>% 
+  filter(year >= 2010) %>% 
+  ggplot(aes(x = year, y = ex, colour = projection, group = projection)) +
+  geom_line() + 
+  facet_wrap(~sex)
+
+```
+
+And now conditional 
+
+```{r, fig.width = 12, fig.height = 10}
+all_projections %>% 
+  filter(year >= 2010) %>% 
+  ggplot(aes(x = year, age, fill = ex)) + 
+  geom_tile() + 
+  facet_grid(sex ~ projection) +
+  scale_fill_distiller(palette = "Paired")
+
+```
+
+And now differences between two consecutive projections 
+
+```{r, fig.width = 12, fig.height = 10}
+all_projections %>% 
+  spread(projection, ex) %>% 
+  mutate(
+    `2012-2014` = `2014 projection` - `2012 projection`,
+    `2014-2016` = `2016 projection` - `2014 projection`,
+    `2016-2018` = `2018 projection` - `2016 projection`
+  ) %>% 
+  select(age, year, sex, `2012-2014`:`2016-2018`) %>% 
+  gather(key = "Comparison", value= "ch_ex", `2012-2014`:`2016-2018`) %>% 
+  filter(year >= 2010) %>% 
+  ggplot(aes(x = year, age, fill = ch_ex)) + 
+  geom_tile() + 
+  facet_grid(sex ~ Comparison) +
+  scale_fill_distiller(palette = "RdBu", limits = c(-1.5, 1.5))
+
+```
+
+I want to check the % change is as expected 
+
+
+```{r}
+all_projections %>% 
+  filter(age == 0) %>% 
+  filter(projection == "2018 projection") %>% 
+  group_by(sex) %>% arrange(year) %>% 
+  mutate(r_e0 = (ex - lag(ex)) / lag(ex)) %>% 
+  filter(year >= 2020) %>% 
+  ggplot(aes(x = year, y = r_e0, colour = sex, group = sex)) + 
+  geom_line()
+
+all_projections %>% 
+  filter(age == 0) %>% 
+  filter(projection == "2018 projection") %>% 
+  group_by(sex) %>% arrange(year) %>% 
+  mutate(d_e0 = ex - lag(ex)) %>% 
+  filter(year >= 2020) %>% 
+  ggplot(aes(x = year, y = d_e0, colour = sex, group = sex)) + 
+  geom_line()
+
+
+```
+
+
+
+===========
+
 
 
 Now, let's determine the average change (and SD) from 1980 to 2010
