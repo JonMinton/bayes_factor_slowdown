@@ -11,7 +11,7 @@ output:
 # Prep preamble 
 
 ```{r, echo = FALSE}
-pacman::p_load(tidyverse, here, changepoint, segmented, ggrepel, knitr, kableExtra, HMDHFDplus)
+pacman::p_load(tidyverse, here, changepoint, segmented, ggrepel, knitr, kableExtra, HMDHFDplus, corrr)
 
 ```
 
@@ -46,15 +46,15 @@ Let's reorganise this material to better reflect the proposed order in the paper
 
 # 1 Annual rates of change internationally 
 
-## Data 
+## 1.1 Data 
 
 The data used were $e_0$ from the [Human Mortality Database](https://www.mortality.org/). 
 
 The data were extracted using the `HMDHFDplus` package. 
 
-## Results 
+## 1.2 Results 
 
-```{r get_e0_hmd, echo = FALSE}
+```{r get_e0_hmd, echo = FALSE, cache = TRUE}
 hmd_e0 <- tibble(
   country = HMDHFDplus::getHMDcountries()
 ) %>% 
@@ -159,6 +159,7 @@ hmd_e0 %>%
 For all mutually exclusive countries in the HMD with data since 1990 onwards, the following shows how annual life expectancy has changed over time 
 
 ```{r, echo = FALSE}
+
 ch_e0_from1990_hmd <- 
   hmd_e0 %>% 
     left_join(code_lookup, by = c("country" = "code")) %>% 
@@ -180,9 +181,13 @@ ch_e0_from1990_hmd %>%
   
 
 ```
-Table/figure should be by decade 
 
-```{r, echo = TRUE}
+## 1.2.1 HMD Average change in $e_0$ by decade
+
+### 1.2.1.1 Figure of HMD Average change in $e_0$ by decade
+
+```{r echo=FALSE, fig.height=10, fig.width=10}
+
 mean_ch_e0_decade_hmd <- 
   ch_e0_from1990_hmd %>% 
     filter(!is.na(ch_e0)) %>% 
@@ -223,13 +228,56 @@ ggsave(here("figures", "mean_ch_e0_decade.png"), height = 30, width = 30, units 
 
 ```
 
+### 1.2.1.2 Table of HMD Average change in $e_0$ by decade
+
+
+```{r}
+mean_ch_e0_decade_hmd <- 
+  ch_e0_from1990_hmd %>% 
+    filter(!is.na(ch_e0)) %>% 
+    mutate(
+      decade = case_when(
+        between(year, 1990, 1999)      ~ "1990s",
+        between(year, 2000, 2009)      ~ "2000s",
+        between(year, 2010, 2020)      ~ "2010s",
+        TRUE                           ~ NA_character_
+      )
+    ) %>% 
+    group_by(label, sex, decade) %>% 
+    summarise(mean_ch_e0 = mean(ch_e0, na.rm = TRUE)) %>% 
+    ungroup() 
+
+
+mean_ch_e0_decade_hmd %>% 
+  left_join(
+    mean_ch_e0_decade_hmd %>% filter(decade == "2010s") %>% 
+      mutate(ch_last = mean_ch_e0) %>% 
+      select(-mean_ch_e0, -decade) 
+  ) %>% 
+  mutate(decade = fct_rev(decade)) %>% 
+  arrange(desc(ch_last)) %>% 
+  select(-ch_last) %>% 
+  unite(col = "sex_decade", sex, decade) %>%
+  rename(Country = label) %>% 
+  mutate(mean_ch_e0 = round(mean_ch_e0, 3)) %>% 
+  spread(sex_decade, mean_ch_e0) %>%
+  set_names(nm = c("Country", rep(c("1990s", "2000s", "2010s"), 2))) %>% 
+  kable() %>% 
+  kable_styling() %>% 
+  add_header_above(c(" ", "Female" = 3, "Male" = 3)) %>% 
+  footnote(general = "Average annual change in life expectancy by decade, sex, and country")
+
+```
+
 The countries with the fastest average improvement in $e_0$ in the 2010s include Belarus (0.38 years/year for females, 0.61 years/year for males), Ukraine (0.34 females, 0.49 males), Russia (0.34 females, 0.48 males), Lithuania (0.23 females, 0.45 males), and Poland (0.25 females, 0.32 males). By contrast, the countries with the slowest improvements in the 2010s include the USA (0.05 females, 0.03 males), Iceland (0.04 females, 0.09 males), the United Kingdom (0.09 females, 0.16 males), Netherlands (0.07 females, 0.19 males), and Germany (0.10 females, 0.17 males). With the exception of the USA, there is still a tendency for improvements in the 2010s to be somewhat faster for males than females. The fastest-improving countries also tended to experience the slowest rates of improvement, or severe deteriorations (worsenings), in life expectancy change in the 1990s. 
 
 The similarity between average rates of improvement in the 2010s in Germany and the UK is noteworthy with average sex specific improvement rates within 0.01 years per year of each other (0.09 compared with 0.10 for females in the UK and Germany respectively; 0.16 compared with 0.17 for males). The German data covers 2010-2017 inclusive, whereas for the UK the data extends to 2016. 
 
+### 1.2.1.3 Annual change in slow gainers since 1990
+
 There are some important differences, however, in how annual change rates have varied in the the slowest-improving countries. Figure X shows this for the five slowest-improving countries excluding Iceland, which due to its small population size shows much greater levels of annual variability than the other countries. From this figure it is apparent that the USA not only tended to show lower rates of improvement before 2010, but has also been exhibiting continuing and more persistent declines than the other countries, with three consecutive years of declining mortality for males in the last three available years, and only modest improvements for females.   
 
-```{r}
+```{r echo=FALSE, fig.height=8, fig.width=8}
 ch_e0_from1990_hmd %>% 
   filter(sex != "total") %>% 
   filter(country %in% c("DEUTNP", "NLD", "USA", "GBR_NP")) %>% 
@@ -254,23 +302,120 @@ ggsave(here("figures", "hmd_slow_in_2010s_che0.png"), height = 15, width = 20, u
 
 ```
 
-# Introduction 
 
-This document will calculate Bayes Factors based on UK nation datas from the ONS.
+# 2 Annual change rates in life expectancy in the UK as a whole and UK nations or groups of nations + change point analyses
+
+The previous section used data from the HMD, comparing the UK as a whole against other countries in the HMD. The last year available for the UK in the HMD was 2016. More recent $e_0$ estimates are available from the ONS, which also provides estimates disaggregated by country and group of countries within the UK. We will use this data to explore how (dis)similar the trends in life expectancy change have been within different UK nations/groups of nations. 
+
+## 2.1 Data
+
+We'll now use the tables from [this location](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/singleyearlifetablesuk1980to2018) to get $e_0$, $m_x$ and related lifetable quantities from a single source, for each UK nation. 
+
+First, I've downloaded each of the single year files to the data directory.
+
+### 2.1.1 Data preparation
+
+The following code will not be run, as the data have already been extracted. However it is kept here for completeness.
+
+First, defining the files to extract lifetables from.
+
+```{r, echo = FALSE, eval = FALSE}
+
+ons_lifetables <- tribble(
+  ~population, ~file_location,
+  "England",          "singleyearlifetablesengland1.xls",
+  "Northern Ireland", "singleyearlifetablesnorthernireland2.xls",
+  "Scotland",         "singleyearlifetablesscotland1.xls",
+  "Wales",            "singleyearlifetableswales1.xls",
+  "England & Wales",  "singleyearlifetablesenglandandwales1.xls",
+  "Great Britain"   , "singleyearlifetablesgreatbritain1.xls",
+  "United Kingdom",   "singleyearlifetablesunitedkingdom1.xls"
+)
+```
+
+Then, defining a function to clean the data from the worksheets in the workbooks.
+
+```{r fn_clean_data, echo = FALSE, eval = FALSE}
+
+clean_data <- function(X){
+  out <- X %>% 
+  select(-junk) %>% 
+  gather(-x, key = "sex_quant", value = "value") %>% 
+  separate(sex_quant, into = c("sex", "variable")) %>% 
+  mutate(sex = case_when(sex == 'm' ~ "male", sex == 'f' ~ "female", TRUE ~ NA_character_))
+  return(out)    
+}
+```
+
+Now, getting the $m_x$ data.
+
+```{r fn_get_mx_data, echo = FALSE, eval = FALSE}
+get_mx_data <- function(path){
+  tibble(
+    year = as.character(1980:2018)
+  ) %>% 
+    mutate(dirty_data = map(
+      year, 
+      ~read_excel(
+        path = path,
+        range = "A8:L108",
+        col_names = c("x", "m_mx", "m_qx", "m_lx", "m_dx", "m_ex", "junk", "f_mx", "f_qx", "f_lx", "f_dx", "f_ex"),
+        sheet = .x
+        ))
+    ) %>% 
+    mutate(
+      tidy_data = map(dirty_data, clean_data)
+    ) %>% 
+    select(-dirty_data) %>% 
+    unnest(cols = c(tidy_data)) %>% 
+  spread(variable, value) %>% 
+  mutate(year = as.numeric(year))
+}
+```
+
+Now, extracting the lifetables in a tidy format.
+
+```{r, cache = TRUE, echo = FALSE, eval= FALSE}
+ons_lifetables <- 
+  ons_lifetables %>% 
+    mutate(mx_data = map(file_location, ~.x %>% here("data",.) %>% get_mx_data())) %>% 
+    select(-file_location) %>% 
+    unnest(cols = c(mx_data))
+
+ons_lifetables
+
+```
+
+From this it's very easy to extract $e_0$ alone.
 
 
+```{r, eval = FALSE, echo = FALSE}
+ons_e0 <- 
+  ons_lifetables %>% 
+    filter(x == 0) %>% 
+    select(population, year, sex, e0 = ex)
 
-# Load data 
+ons_e0
+
+write_csv(ons_e0, here("data", "e0_from_ons_allnations.csv"))
+```
+
+To save on this, let's just load the tidied $e_0$ data
 
 ```{r}
 dta_e0 <- read_csv(here("data", "e0_from_ons_allnations.csv"))
-
 dta_e0
 ```
 
+## 2.2 Analysis
+
+### 2.2.1 Change in life expectancy in UK nations and groups of nations 
+
+#### 2.2.1.1 Figure of change in life expectancy in UK nations and groups of nations
+
 Visualise the life expectancy and change in life expectancy for each year 
 
-```{r, fig.width = 12, fig.height = 12}
+```{r, fig.width = 12, fig.height = 12, echo = FALSE}
 dta_e0 %>% 
   group_by(population, sex) %>% 
   arrange(year) %>% 
@@ -296,8 +441,186 @@ ggsave(here("figures", "annual_e0_ch_alluknations_ons.png"), height = 25, width 
 
 ```
 
+From the above it seems most populations have seen a slowdown in improvement in recent years, and on average relatively stable improvements previously, with the exception of Northern Ireland, which saw a slowdown in improvement in the 1980s. The smaller populations tend to exhibit greater variability in annual rates of change than the larger populations. The extent of oscillation (negative autocorrelation from one year to the next) also appears greater in smaller populations. It is not immediately clear that the breakpoint for the slowdown is the same for all UK populations.  
 
-From the above it seems most populations have seen a slowdown in improvement in recent years, and on average relatively stable improvements previously, with the exception of Northern Ireland, which saw a slowdown in improvement in the 1980s. The smaller populations tend to exhibit greater variability in annual rates of change than the larger populations. The extent of oscillation (negative autocorrelation from one year to the next) also apepars greater in smaller populations. It is not immediately clear that the breakpoint for the slowdown is the same for all UK populations.  
+### 2.2.2 Average change by decade 
+
+As before, let's look at the average improvement per decade. This will allow us to compare the UK rates from the ONS against those in the HMD. 
+
+```{r}
+ons_ch_e0_decade <- 
+  dta_e0 %>% 
+    group_by(population, sex) %>% 
+    arrange(year) %>% 
+    mutate(ch_e0 = e0 - lag(e0)) %>% 
+    ungroup() %>% 
+    mutate(
+      population = fct_relevel(population, c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland"))
+    ) %>% 
+    filter(!is.na(ch_e0)) %>% 
+    select(-e0) %>% 
+    mutate(
+        decade = case_when(
+          between(year, 1980, 1989)      ~ "1980s",
+          between(year, 1990, 1999)      ~ "1990s",
+          between(year, 2000, 2009)      ~ "2000s",
+          between(year, 2010, 2020)      ~ "2010s",
+          TRUE                           ~ NA_character_
+      )
+    ) %>% 
+    group_by(population, sex, decade) %>% 
+    summarise(mean_ch_e0 = mean(ch_e0, na.rm = TRUE)) %>% 
+    ungroup() 
+
+ons_ch_e0_decade
+
+```
+
+As expected, the ONS and HMD estimates of mean improvement per decade are closely aligned, usually within two decimal places, though are somewhat lower in the 2010s for ONS than for HMD:
+
+| sex | decade | HMD   | ONS   |
+|-----|--------|-------|-------|
+| f   | 90s    | 0.168 | 0.170 |
+| f   | 00s    | 0.244 | 0.241 |
+| f   | 10s    | 0.091 | 0.080 |
+| m   | 90s    | 0.229 | 0.232 |
+| m   | 00s    | 0.319 | 0.313 |
+| m   | 10s    | 0.164 | 0.131 |
+
+
+Let's now present this as a barplot 
+
+```{r}
+ons_ch_e0_decade %>% 
+  filter(population %in% c("United Kingdom", "Wales", "Scotland", "England", "Northern Ireland")) %>% 
+  left_join(
+    ons_ch_e0_decade %>% filter(decade == "2010s") %>% 
+      mutate(ch_last = mean_ch_e0) %>% 
+      select(-mean_ch_e0, -decade) 
+  ) %>% 
+  mutate(decade = fct_rev(decade)) %>% 
+  ggplot(aes(x = population, y = mean_ch_e0, group = decade, colour = decade, fill = decade)) + 
+  geom_col(position = "dodge") + 
+  facet_wrap(~sex) + 
+  coord_flip() + 
+  scale_fill_grey("Decade", guide = guide_legend(reverse = TRUE)) + 
+  scale_colour_grey("Decade", guide = guide_legend(reverse = TRUE)) + 
+  labs(
+    x = "Country", y = "Mean annual life expectancy change in years",
+    title = "Mean annual change in life expectancy in UK nations, by sex and decade",
+    
+    caption = "Source: Office for National Statistics"
+  )
+
+ggsave(here("figures", "mean_ch_e0_decade_uknations.png"), height = 20, width = 30, units = "cm", dpi = 300)
+
+
+```
+
+For each UK nation, the 2000s had exceptionally high rates of improvement. By contrast the 2010s are exceptionally low. Within Northern Ireland, there was an exceptionally high rate of improvement in the 1980s. Rates of improvement in the 2000s have been higher in the 2000s in males than females. 
+
+
+### 2.2.3 Change in life expectancy in mutually exclusive UK nations
+
+#### 2.2.3.1 Change in life expectancy in mutually exclusive UK nations - faceted
+
+
+```{r, fig.width = 12, fig.height = 12, echo = FALSE}
+
+dta_e0 %>% 
+  filter(population %in% c("England", "Wales", "Scotland", "Northern Ireland")) %>% 
+  group_by(population, sex) %>% 
+  arrange(year) %>% 
+  mutate(ch_e0 = e0 - lag(e0)) %>% 
+  ungroup() %>% 
+  mutate(
+    population = fct_relevel(population, c("England", "Scotland", "Wales", "Northern Ireland"))
+  ) %>% 
+  mutate(ch_e0 = 52.25 * ch_e0) %>% 
+  ggplot(aes(x = year, y = ch_e0)) + 
+  stat_smooth() +
+  geom_point() + geom_line() + 
+  facet_wrap(population ~ sex) + 
+  geom_hline(yintercept = 0) + 
+  labs(
+    x = "Year", y = "Annual change in life expectancy from previous year (in weeks)",
+    title = "Annual period life expectancy changes in UK nations",
+    subtitle = "Blue line and grey band shows smoothed trend",
+    caption = "Source: ONS life tables (single years)"
+  ) 
+
+ggsave(here("figures", "annual_e0_ch_all_DISTINCT_uknations_ons.png"), height = 25, width = 25, units = "cm", dpi = 300)
+
+
+```
+
+#### 2.2.3.2 Change in life expectancy in mutually exclusive UK nations - overlaid
+
+
+```{r, fig.width = 12, fig.height = 8, echo = FALSE}
+
+dta_e0 %>% 
+  filter(population %in% c("England", "Wales", "Scotland", "Northern Ireland")) %>% 
+  group_by(population, sex) %>% 
+  arrange(year) %>% 
+  mutate(ch_e0 = e0 - lag(e0)) %>% 
+  ungroup() %>% 
+  mutate(
+    population = fct_relevel(population, c("England", "Scotland", "Wales", "Northern Ireland"))
+  ) %>% 
+  mutate(ch_e0 = 52.25 * ch_e0) %>% 
+  ggplot(aes(x = year, y = ch_e0, group = population, colour = population, shape = population)) + 
+  geom_point() + geom_line() + 
+  facet_wrap( ~ sex) + 
+  geom_hline(yintercept = 0) + 
+  labs(
+    x = "Year", y = "Annual change in life expectancy from previous year (in weeks)",
+    title = "Annual period life expectancy changes in UK nations",
+    subtitle = "Blue line and grey band shows smoothed trend",
+    caption = "Source: ONS life tables (single years)"
+  ) 
+
+ggsave(here("figures", "annual_e0_ch_all_DISTINCT_uknations_ons_overlaid.png"), height = 15, width = 25, units = "cm", dpi = 300)
+
+
+```
+
+There are clear similarities between the trends in each of the UK nations, again with the exception of Northern Ireland. The trends even seem to correspond in terms of which years are 'good years' and which years are 'bad years' (i.e. they oscillate in phase with each other). To check this let's look at the correlation between the trends 
+
+```{r}
+corrs_trends <- 
+  dta_e0 %>% 
+    filter(population %in% c("England", "Wales", "Scotland", "Northern Ireland")) %>% 
+    group_by(population, sex) %>% 
+    arrange(year) %>% 
+    mutate(ch_e0 = e0 - lag(e0)) %>% 
+    ungroup() %>% 
+    filter(!is.na(ch_e0)) %>% 
+    select(-e0) %>% 
+    unite(col = "pop_sex", population, sex) %>% 
+    spread(pop_sex, ch_e0) %>% 
+    select(-year) %>% 
+    correlate() 
+
+corrs_trends
+
+corrs_trends %>% 
+  rplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+corrs_trends %>% 
+  network_plot()
+
+```
+
+Trends in males and females in England are highly correlated (r = 0.89). The correlation between male and female trends in Wales are also strong (r = 0.77), which is slightly below the correlation between females in England and Wales (r = 0.81). Correlations between males and females in Scotland are slightly weaker (r = 0.67), and the associations between sexes are weakest in Northern Ireland (r = 0.55). 
+
+The network plot places series that are more correlated with each other closer together, and less correlated series further from each other. This confirms that males' and females' trends are closely correlated to each other in England and Wales, somewhat less so in Scotland, and least in Northern Ireland, where trends between sexes are less correlated with each other than are the correlations between countries elsewhere in the UK. 
+
+This suggests that any general trends which apply throughout the UK will apply less strongly in Northern Ireland than elsewhere. This should be considered when looking at the results in the next section, which aims to identify if and when there have been breakpoints in the trends in UK nations. 
+
+### 2.2.4 Breakpoint analysis
+
 
 Let's now explore the slowdown by running breakpoint analysis 
 
