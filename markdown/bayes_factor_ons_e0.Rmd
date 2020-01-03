@@ -934,7 +934,7 @@ For Wales, the projections are [available here](https://www.ons.gov.uk/peoplepop
 
 * [2018 projection for Wales](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2018based/walppp18ex.xls)
 * [2016 projection for Wales](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2016based/wwalprincipal16.xls)
-* [2014 projection for Wales](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2016based/wwalprincipal14.xls)
+* [2014 projection for Wales](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2014based/wwalprincipal14.xls)
 * [2012 projection for Wales](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2012based/wwalprincipal12.xls) 
 
 For Northern Ireland, the projections are [available here](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/expectationoflifeprincipalprojectionnorthernireland)
@@ -955,6 +955,271 @@ The for United Kingdom, the projections are [available here](https://www.ons.gov
 *TO DO*
 
 * Download all of the above and load and tidy them
+
+
+```{r download_proj_uk, eval = FALSE}
+
+# uk - 2018
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionunitedkingdom%2f2018based/ukppp18ex.xls",
+  destfile = here("data", "ons_projections", "united_kingdom", "proj_2018.xls"),
+  mode = "wb"
+)
+
+# uk - 2016
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionunitedkingdom%2f2016based/wukprincipal16.xls",
+  destfile = here("data", "ons_projections", "united_kingdom", "proj_2016.xls"),
+  mode = "wb"
+)
+
+# uk - 2014
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionunitedkingdom%2f2014based/wukprincipal14.xls",
+  destfile = here("data", "ons_projections", "united_kingdom", "proj_2014.xls"),
+  mode = "wb"
+)
+
+# uk - 2012
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionunitedkingdom%2f2012based/wukprincipal12exr.xls",
+  destfile = here("data", "ons_projections", "united_kingdom", "proj_2012.xls"),
+  mode = "wb"
+)
+
+
+
+```
+
+For England, the projections are [available here](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/expectationoflifeprincipalprojectionengland).
+
+* [2018 projection for England](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionengland%2f2018based/engppp18ex.xls)
+* [2016 projection for England](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionengland%2f2016based/wengprincipal16.xls)
+* [2014 projection for England](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionengland%2f2014based/wengprincipal14.xls)
+* [2012 projection for England](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionengland%2f2012based/wengprincipal12.xls)
+
+```{r download_proj_england}
+
+# england - 2018
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionengland%2f2018based/engppp18ex.xls",
+  destfile = here("data", "ons_projections", "england", "proj_2018.xls"),
+  mode = "wb"
+)
+
+# england - 2016
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionengland%2f2016based/wengprincipal16.xls",
+  destfile = here("data", "ons_projections", "england", "proj_2016.xls"),
+  mode = "wb"
+)
+
+# england - 2014
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionengland%2f2014based/wengprincipal14.xls",
+  destfile = here("data", "ons_projections", "england", "proj_2014.xls"),
+  mode = "wb"
+)
+
+# england - 2012
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionengland%2f2012based/wengprincipal12.xls",
+  destfile = here("data", "ons_projections", "england", "proj_2012.xls"),
+  mode = "wb"
+)
+
+
+
+```
+For Wales, the projections are [available here](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/expectationoflifeprincipalprojectionwales).
+
+* [2018 projection for Wales](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2018based/walppp18ex.xls)
+* [2016 projection for Wales](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2016based/wwalprincipal16.xls)
+* [2014 projection for Wales](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2014based/wwalprincipal14.xls)
+* [2012 projection for Wales](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2012based/wwalprincipal12.xls) 
+
+```{r download_proj_wales, eval = FALSE}
+
+# wales - 2018
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2018based/walppp18ex.xls",
+  destfile = here("data", "ons_projections", "wales", "proj_2018.xls"),
+  mode = "wb"
+)
+
+# wales - 2016
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2016based/wwalprincipal16.xls",
+  destfile = here("data", "ons_projections", "wales", "proj_2016.xls"),
+  mode = "wb"
+)
+
+# wales - 2014
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2014based/wwalprincipal14.xls",
+  destfile = here("data", "ons_projections", "wales", "proj_2014.xls"),
+  mode = "wb"
+)
+
+# wales - 2012
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2012based/wwalprincipal12.xls",
+  destfile = here("data", "ons_projections", "wales", "proj_2012.xls"),
+  mode = "wb"
+)
+
+
+
+```
+
+For Northern Ireland, the projections are [available here](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/expectationoflifeprincipalprojectionnorthernireland)
+
+* [2018 projection for Northern Ireland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionnorthernireland%2f2018based/nippp18ex.xls)
+* [2016 projection for Northern Ireland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionnorthernireland%2f2016based/wniprincipal16.xls)
+* [2014 projection for Northern Ireland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionnorthernireland%2f2014based/wniprincipal14.xls)
+* [2012 projection for Northern Ireland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionnorthernireland%2f2012based/wniprincipal12.xls)
+
+```{r download_proj_northernireland, eval = FALSE}
+
+# northern ireland - 2018
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionnorthernireland%2f2018based/nippp18ex.xls",
+  destfile = here("data", "ons_projections", "northern_ireland", "proj_2018.xls"),
+  mode = "wb"
+)
+
+# northern ireland - 2016
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionnorthernireland%2f2016based/wniprincipal16.xls",
+  destfile = here("data", "ons_projections", "northern_ireland", "proj_2016.xls"),
+  mode = "wb"
+)
+
+# northern ireland - 2014
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionnorthernireland%2f2014based/wniprincipal14.xls",
+  destfile = here("data", "ons_projections", "northern_ireland", "proj_2014.xls"),
+  mode = "wb"
+)
+
+# northern ireland - 2012
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionnorthernireland%2f2012based/wniprincipal12.xls",
+  destfile = here("data", "ons_projections", "northern_ireland", "proj_2012.xls"),
+  mode = "wb"
+)
+
+
+
+```
+
+For Scotland, the data for the projections are made available at [this location](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/expectationoflifeprincipalprojectionscotland
+) on the ONS website: 
+
+The specific projections are available at the following locations: 
+
+* [2018 projection for Scotland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionscotland%2f2018based/scppp18ex.xls) 
+* [2016 projection for Scotland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionscotland%2f2016based/wscoprincipal16.xls) 
+* [2014 projection for Scotland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionscotland%2f2014based/wscoprincipal14.xls)
+* [2012 projection for Scotland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionscotland%2f2012based/wscoprincipal12exr.xls)
+
+```{r download_proj_scotland}
+
+# scotland - 2018
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionscotland%2f2018based/scppp18ex.xls",
+  destfile = here("data", "ons_projections", "scotland", "proj_2018.xls"),
+  mode = "wb"
+)
+
+# scotland - 2016
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionscotland%2f2016based/wscoprincipal16.xls",
+  destfile = here("data", "ons_projections", "scotland", "proj_2016.xls"),
+  mode = "wb"
+)
+
+# scotland - 2014
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionscotland%2f2014based/wscoprincipal14.xls",
+  destfile = here("data", "ons_projections", "scotland", "proj_2014.xls"),
+  mode = "wb"
+)
+
+# scotland - 2012
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionscotland%2f2012based/wscoprincipal12exr.xls",
+  destfile = here("data", "ons_projections", "scotland", "proj_2012.xls"),
+  mode = "wb"
+)
+
+
+
+```
+
+Now to start loading all in a tidy way 
+
+```{r}
+file_locs_params <- tribble(
+  ~country,   ~sex,   ~year, ~ file, ~loc, ~ skip,
+  "UK", "f", 2012, here("data", "ons_projections", "united_kingdom", "proj_2012.xls"),   "Females Period ex", 10,
+  "UK", "m", 2012, here("data", "ons_projections", "united_kingdom", "proj_2012.xls"),   "Males Period ex", 10,
+  "UK", "f", 2014, here("data", "ons_projections", "united_kingdom", "proj_2014.xls"),   "Females period ex", 9,
+  "UK", "m", 2014, here("data", "ons_projections", "united_kingdom", "proj_2014.xls"),   "Males period ex", 9,
+  "UK", "f", 2016, here("data", "ons_projections", "united_kingdom", "proj_2016.xls"),   "Females period ex", 9,
+  "UK", "m", 2016, here("data", "ons_projections", "united_kingdom", "proj_2016.xls"),   "Males period ex", 9,
+  "UK", "f", 2018, here("data", "ons_projections", "united_kingdom", "proj_2018.xls"),   "Females period ex", 9,
+  "UK", "m", 2018, here("data", "ons_projections", "united_kingdom", "proj_2018.xls"),   "Males period ex", 9,
+  "England", "f", 2012, here("data", "ons_projections", "england", "proj_2012.xls"),   "Females Period ex", 10,
+  "England", "m", 2012, here("data", "ons_projections", "england", "proj_2012.xls"),   "Males Period ex", 10,
+  "England", "f", 2014, here("data", "ons_projections", "england", "proj_2014.xls"),   "Females Period ex", 9,
+  "England", "m", 2014, here("data", "ons_projections", "england", "proj_2014.xls"),   "Males Period ex", 9,
+  "England", "f", 2016, here("data", "ons_projections", "england", "proj_2016.xls"),   "Females Period ex", 9,
+  "England", "m", 2016, here("data", "ons_projections", "england", "proj_2016.xls"),   "Males Period ex", 9,
+  "England", "f", 2018, here("data", "ons_projections", "england", "proj_2018.xls"),   "Females period ex", 9,
+  "England", "m", 2018, here("data", "ons_projections", "england", "proj_2018.xls"),   "Males period ex", 9,
+  "Wales", "f", 2012, here("data", "ons_projections", "wales", "proj_2012.xls"),   "Females Period ex", 10,
+  "Wales", "m", 2012, here("data", "ons_projections", "wales", "proj_2012.xls"),   "Males Period ex", 10,
+  "Wales", "f", 2014, here("data", "ons_projections", "wales", "proj_2014.xls"),   "Females period ex", 9,
+  "Wales", "m", 2014, here("data", "ons_projections", "wales", "proj_2014.xls"),   "Males period ex", 9,
+  "Wales", "f", 2016, here("data", "ons_projections", "wales", "proj_2016.xls"),   "Females period ex", 9,
+  "Wales", "m", 2016, here("data", "ons_projections", "wales", "proj_2016.xls"),   "Males period ex", 9,
+  "Wales", "f", 2018, here("data", "ons_projections", "wales", "proj_2018.xls"),   "Females period ex", 9,
+  "Wales", "m", 2018, here("data", "ons_projections", "wales", "proj_2018.xls"),   "Males period ex", 9,
+  "Northern Ireland", "f", 2012, here("data", "ons_projections", "northern_ireland", "proj_2012.xls"),   "Females Period ex", 10,
+  "Northern Ireland", "m", 2012, here("data", "ons_projections", "northern_ireland", "proj_2012.xls"),   "Males Period ex", 10,
+  "Northern Ireland", "f", 2014, here("data", "ons_projections", "northern_ireland", "proj_2014.xls"),   "Females period ex", 9,
+  "Northern Ireland", "m", 2014, here("data", "ons_projections", "northern_ireland", "proj_2014.xls"),   "Males period ex", 9,
+  "Northern Ireland", "f", 2016, here("data", "ons_projections", "northern_ireland", "proj_2016.xls"),   "Females period ex", 9,
+  "Northern Ireland", "m", 2016, here("data", "ons_projections", "northern_ireland", "proj_2016.xls"),   "Males period ex", 9,
+  "Northern Ireland", "f", 2018, here("data", "ons_projections", "northern_ireland", "proj_2018.xls"),   "Females period ex", 9,
+  "Northern Ireland", "m", 2018, here("data", "ons_projections", "northern_ireland", "proj_2018.xls"),   "Males period ex", 9,
+  "Scotland", "f", 2012, here("data", "ons_projections", "scotland", "proj_2012.xls"),   "Females Period ex", 10,
+  "Scotland", "m", 2012, here("data", "ons_projections", "scotland", "proj_2012.xls"),   "Males Period ex", 10,
+  "Scotland", "f", 2014, here("data", "ons_projections", "scotland", "proj_2014.xls"),   "Females period ex", 9,
+  "Scotland", "m", 2014, here("data", "ons_projections", "scotland", "proj_2014.xls"),   "Males period ex", 9,
+  "Scotland", "f", 2016, here("data", "ons_projections", "scotland", "proj_2016.xls"),   "Females period ex", 9,
+  "Scotland", "m", 2016, here("data", "ons_projections", "scotland", "proj_2016.xls"),   "Males period ex", 9,
+  "Scotland", "f", 2018, here("data", "ons_projections", "scotland", "proj_2018.xls"),   "Females period ex", 9,
+  "Scotland", "m", 2018, here("data", "ons_projections", "scotland", "proj_2018.xls"),   "Males period ex", 9
+  
+)
+
+```
+
+Now to load all sheets 
+
+```{r}
+load_sheet <- function(path, sheet, skip){
+  read_excel(path = path, sheet = sheet , skip = skip) %>% slice(-1)
+}
+
+file_locs_params_sheets <- 
+  file_locs_params %>% 
+    mutate(sheet = pmap(.l = list(path = file, sheet = loc, skip = skip), .f = load_sheet ))
+
+file_locs_params_sheets 
+```
 
 ```{r}
 proj_2018_males <- read_excel(path = here("data", "ons_projections", "scotland", "scppp18ex.xls"),
@@ -997,48 +1262,87 @@ proj_2012_females <- read_excel(path = here("data", "ons_projections", "scotland
 
 Now tidying, gathering, and combining 
 
-
 ```{r}
-all_projections <- bind_rows(
-proj_2012_females %>% 
-  rename(age = `(years)`) %>% 
-  gather(-age, key = "year", value = "ex") %>% 
-  mutate(sex = "female", projection = "2012 projection"),
-proj_2012_males %>% 
-  rename(age = `(years)`) %>% 
-  gather(-age, key = "year", value = "ex") %>% 
-  mutate(sex = "male", projection = "2012 projection"),
-proj_2014_males %>% 
-  rename(age = `Attained age (years)`) %>% 
-  gather(-age, key = "year", value = "ex") %>% 
-  mutate(sex = "male", projection = "2014 projection"),
-proj_2014_females %>% 
-  rename(age = `Attained age (years)`) %>% 
-  gather(-age, key = "year", value = "ex") %>% 
-  mutate(sex = "female", projection = "2014 projection"),
-proj_2016_males %>% 
-  rename(age = `Attained age (years)`) %>% 
-  gather(-age, key = "year", value = "ex") %>% 
-  mutate(sex = "male", projection = "2016 projection"),
-proj_2016_females %>% 
-  rename(age = `Attained age (years)`) %>% 
-  gather(-age, key = "year", value = "ex") %>% 
-  mutate(sex = "female", projection = "2016 projection"),
-proj_2018_males %>% 
-  rename(age = `Attained age (years)`) %>% 
-  gather(-age, key = "year", value = "ex") %>% 
-  mutate(sex = "male", projection = "2018 projection"),
-proj_2018_females %>% 
-  rename(age = `Attained age (years)`) %>% 
-  gather(-age, key = "year", value = "ex") %>% 
-  mutate(sex = "female", projection = "2018 projection")
-) %>% 
-  mutate(year = as.numeric(year))
-all_projections
+tidy_contents <- function(x, year){
+  nms <- names(x)
+  nms[1] <- "age"
+  x %>% 
+    set_names(nm = nms) %>% 
+    gather(-age, key = "year", value = "ex")
+}
 
+ons_projections_tidied <- 
+  file_locs_params_sheets %>% 
+    mutate(sheet = map2(sheet, year, tidy_contents)) %>% 
+    select(country, sex, proj_year = year, sheet) %>% 
+    unnest(cols = c(sheet)) %>% 
+    mutate(year = as.numeric(year))
+
+ons_projections_tidied
 
 ```
 
+How do the projections (e0 at birth) change over time between countries? 
+
+
+```{r}
+ons_projections_tidied %>% 
+  filter(age == 0) %>% 
+  filter(year >= 2010) %>% 
+  mutate(country = factor(country, levels = c("UK", "England", "Northern Ireland", "Scotland", "Wales"))) %>% 
+  ggplot(aes(x = year, y = ex, group = factor(proj_year), colour = factor(proj_year))) + 
+  facet_grid(country ~ sex) +
+  geom_line()
+
+```
+
+For each of these projections, what's the implied expected improvement level? 
+
+```{r}
+ons_projections_tidied %>% 
+  filter(age == 0) %>% 
+  filter(year >= 2019) %>% 
+  group_by(sex, country, proj_year) %>% 
+  arrange(year) %>% 
+  mutate(ch_e0 = ex - lag(ex)) %>% 
+  filter(!is.na(ch_e0)) %>% 
+  ggplot(aes(x = year, y = ch_e0, group = factor(proj_year), colour = factor(proj_year), shape = factor(proj_year))) + 
+  geom_point() + geom_line() +
+  facet_grid(country ~ sex)
+
+```
+
+So, the projections involve adding varying numbers of increments of 0.1 life expectancy gain per year. Values within these intervals are created by changing the numbers of years of 0.2, 0.1 and 0.0 gain. 
+
+Let's summarise this:
+
+```{r}
+ons_projections_summarised <- 
+  ons_projections_tidied %>% 
+    filter(age == 0) %>% 
+    filter(year >= 2019) %>% 
+    group_by(sex, country, proj_year) %>% 
+    arrange(year) %>% 
+    mutate(ch_e0 = ex - lag(ex)) %>% 
+    summarise(
+      mean_ch_e0 = mean(ch_e0, na.rm = TRUE),
+      sd_ch_e0   = sd(ch_e0, na.rm = TRUE  )
+    ) 
+
+ons_projections_summarised
+```
+
+Visualise
+
+```{r}
+ons_projections_summarised %>% 
+  ggplot(aes(x = proj_year, y = mean_ch_e0)) +
+  geom_point() + 
+  geom_errorbar(aes(ymin = mean_ch_e0 - 2 * sd_ch_e0, ymax = mean_ch_e0 + 2 * sd_ch_e0), width = 0) +
+  facet_grid(sex ~ country) +
+  expand_limits(y = 0)
+
+```
 
 Now to visualise 
 
