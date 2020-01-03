@@ -80,7 +80,7 @@ hmd_e0 <- read_csv(here("data", "e0_hmd.csv"))
 
 Let's label the countries and pick out only mutually exclusive populations. The code lookups are [here](https://www.mortality.org/Public/HMD-countries-codes.pdf)
 
-```{r, warning = FALSE}
+```{r, warning = FALSE, echo = FALSE}
 code_lookup <- tribble(
   ~code,    ~label,                      ~include, 
   "AUS",     "Australia",                  1, 
@@ -138,7 +138,7 @@ code_lookup <- tribble(
 
 
 
-```{r, warning = FALSE}
+```{r, warning = FALSE, echo = FALSE}
 #Are any codes not matched?
 hmd_e0 %>% 
   left_join(code_lookup, by = c("country" = "code")) %>% 
@@ -238,7 +238,7 @@ ggsave(here("figures", "mean_ch_e0_decade.png"), height = 30, width = 30, units 
 ### 1.2.1.2 Table of HMD Average change in $e_0$ by decade
 
 
-```{r, warning = FALSE}
+```{r, warning = FALSE, echo = FALSE}
 mean_ch_e0_decade_hmd <- 
   ch_e0_from1990_hmd %>% 
     filter(!is.na(ch_e0)) %>% 
@@ -409,7 +409,7 @@ write_csv(ons_e0, here("data", "e0_from_ons_allnations.csv"))
 
 To save on this, let's just load the tidied $e_0$ data
 
-```{r, warning = FALSE}
+```{r, warning = FALSE, echo = FALSE}
 dta_e0 <- read_csv(here("data", "e0_from_ons_allnations.csv"))
 dta_e0
 ```
@@ -497,7 +497,7 @@ As expected, the ONS and HMD estimates of mean improvement per decade are closel
 
 Let's now present this as a barplot 
 
-```{r, warning = FALSE}
+```{r, warning = FALSE, echo = FALSE}
 ons_ch_e0_decade %>% 
   filter(population %in% c("United Kingdom", "Wales", "Scotland", "England", "Northern Ireland")) %>% 
   left_join(
@@ -633,7 +633,7 @@ The following section will perform breakpoint analysis using the `segmented` pac
 
 First we look to see if two and three breakpoints can be identified in any of the populations. 
 
-```{r, echo = TRUE, warning = FALSE}
+```{r, echo = FALSE, warning = FALSE}
 
 datablocks <- 
   dta_e0 %>% 
@@ -674,7 +674,7 @@ In many cases, breakpoints cannot be identified. However this may be if multiple
 
 To investigate this, let's explore whether the same single breakpoint can be consistently identified. We can do that by checking whether the choice of random number seed matters.
 
-```{r, warning = FALSE}
+```{r, warning = FALSE, echo = FALSE}
 segmods1brk_seed01 <- vector(mode = "list", length = 14)
 segmods1brk_seed02 <- vector(mode = "list", length = 14)
 segmods1brk_seed03 <- vector(mode = "list", length = 14)
@@ -702,7 +702,7 @@ Note that consecutive random numbers cannot be used, as for some random numbers 
 
 Let's pull the 1 breakpoint estimates 
 
-```{r, warning = FALSE}
+```{r, warning = FALSE, echo = FALSE}
 get_brks <- function(x){
   tryCatch(summary(x)$psi[,2], finally = NULL)
 }
@@ -730,7 +730,7 @@ This shows that 1 breakpoint models can be identified for each population, but 2
 The following shows the breakpoints and standard errors.
 
 
-```{r, warning = FALSE}
+```{r, warning = FALSE, echo = FALSE}
 datablocks %>% 
   ungroup() %>% 
   mutate(
@@ -770,7 +770,7 @@ ggsave(here("figures", "breakpoint_uk_allgroups.png"), height = 15, width = 25, 
 
 This shows a lot of consistency in estimates of when the breakdown occurred. With the exception of Northern Ireland, we can use 2010 afterwards as 'post-slowdown', and the years from 1980 onwards as 'pre-slowdown'.
 
-```{r, warning = FALSE}
+```{r, warning = FALSE, echo = FALSE}
 datablocks %>% 
   ungroup() %>% 
   mutate(
@@ -956,7 +956,7 @@ The for United Kingdom, the projections are [available here](https://www.ons.gov
 ### 3.1.1 Pull all data from ONS website
 
 
-```{r download_proj_uk, eval = FALSE}
+```{r download_proj_uk, eval = FALSE, echo = FALSE}
 
 # uk - 2018
 download.file(
@@ -997,7 +997,7 @@ For England, the projections are [available here](https://www.ons.gov.uk/peoplep
 * [2014 projection for England](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionengland%2f2014based/wengprincipal14.xls)
 * [2012 projection for England](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionengland%2f2012based/wengprincipal12.xls)
 
-```{r download_proj_england, eval = FALSE}
+```{r download_proj_england, eval = FALSE, echo = FALSE}
 
 # england - 2018
 download.file(
@@ -1037,7 +1037,7 @@ For Wales, the projections are [available here](https://www.ons.gov.uk/peoplepop
 * [2014 projection for Wales](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2014based/wwalprincipal14.xls)
 * [2012 projection for Wales](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionwales%2f2012based/wwalprincipal12.xls) 
 
-```{r download_proj_wales, eval = FALSE}
+```{r download_proj_wales, eval = FALSE, echo = FALSE}
 
 # wales - 2018
 download.file(
@@ -1078,7 +1078,7 @@ For Northern Ireland, the projections are [available here](https://www.ons.gov.u
 * [2014 projection for Northern Ireland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionnorthernireland%2f2014based/wniprincipal14.xls)
 * [2012 projection for Northern Ireland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionnorthernireland%2f2012based/wniprincipal12.xls)
 
-```{r download_proj_northernireland, eval = FALSE}
+```{r download_proj_northernireland, eval = FALSE, echo = FALSE}
 
 # northern ireland - 2018
 download.file(
@@ -1122,7 +1122,7 @@ The specific projections are available at the following locations:
 * [2014 projection for Scotland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionscotland%2f2014based/wscoprincipal14.xls)
 * [2012 projection for Scotland](https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fbirthsdeathsandmarriages%2flifeexpectancies%2fdatasets%2fexpectationoflifeprincipalprojectionscotland%2f2012based/wscoprincipal12exr.xls)
 
-```{r download_proj_scotland, eval = FALSE}
+```{r download_proj_scotland, eval = FALSE, echo = FALSE}
 
 # scotland - 2018
 download.file(
@@ -1160,7 +1160,7 @@ download.file(
 
 Now to start loading all in a tidy way 
 
-```{r}
+```{r, echo = FALSE, eval = FALSE}
 file_locs_params <- tribble(
   ~country,   ~sex,   ~year, ~ file, ~loc, ~ skip,
   "UK", "f", 2012, here("data", "ons_projections", "united_kingdom", "proj_2012.xls"),   "Females Period ex", 10,
@@ -1210,7 +1210,7 @@ file_locs_params <- tribble(
 
 Now to load all sheets 
 
-```{r, eval = FALSE}
+```{r, eval = FALSE, echo = FALSE}
 load_sheet <- function(path, sheet, skip){
   read_excel(path = path, sheet = sheet , skip = skip) %>% slice(-1)
 }
@@ -1227,7 +1227,7 @@ file_locs_params_sheets
 
 Now tidying, gathering, and combining 
 
-```{r, eval = FALSE}
+```{r, eval = FALSE, echo = FALSE}
 tidy_contents <- function(x, year){
   nms <- names(x)
   nms[1] <- "age"
@@ -1248,12 +1248,17 @@ ons_projections_tidied
 ons_projections_tidied %>% 
   write_csv(here("data", "ons_projections", "all_tidied.csv"))
 
+ons_projections_tidied %>% 
+  write_rds(here("data", "ons_projections", "all_tidied.rds"))
+
+
+
 ```
 
 Just load it 
 
 ```{r}
-ons_projections_tidied <- read_csv(here("data", "ons_projections", "all_tidied.csv"))
+ons_projections_tidied <- read_rds(here("data", "ons_projections", "all_tidied.rds"))
 
 ```
 
@@ -1428,6 +1433,27 @@ ons_projections_summarised <-
 ons_projections_summarised
 ```
 
+
+At this point let's compare the ONS projections against the historic values observed since 1990
+
+| sex | decade | HMD   | ONS   |
+|-----|--------|-------|-------|
+| f   | 90s    | 0.168 | 0.170 |
+| f   | 00s    | 0.244 | 0.241 |
+| f   | 10s    | 0.091 | 0.080 |
+| m   | 90s    | 0.229 | 0.232 |
+| m   | 00s    | 0.319 | 0.313 |
+| m   | 10s    | 0.164 | 0.131 |
+
+| sex | 2012  | 2014  | 2016  | 2018  |
+|-----|------ | ----  | ----  | ----  |
+| f   | 0.137 | 0.129 | 0.115 | 0.094 |
+| m   | 0.148 | 0.147 | 0.134 | 0.114 |
+
+So, the projections have all assumed that the rates of improvement observed in the 2000s are not sustainable in the long term, but have been downrated by around a third from 2012 to 2018 for females, and by around a fifth from 2012 to 2018 for males. Assumed rates of improvement are around 17.5% higher than observed in the 2010s for females, and around 13% higher than observed in the 2010s for males. 
+
+
+
 #### 3.3.1.1 Average projected improvement - visualised
 
 
@@ -1517,7 +1543,7 @@ bf_uk_nations <-
     crossing(after_end = 2011:2018) %>% 
     mutate(
       bayes_df = map2(
-        after_end, data, ~calc_bayes_factors(after_period = c(2011, .x), before_period = c(1981, 2010), outcome_var = ch_e0, dta = .y)
+        after_end, data, ~calc_bayes_factors(after_period = c(2011, .x), before_period = c(1991, 2010), outcome_var = ch_e0, dta = .y)
       )
     ) %>% 
     select(population, sex, after_end, bayes_df) %>% 
@@ -1631,6 +1657,20 @@ Some important points:
 * This approach means that the process of updating beliefs about the extent and evidence for a slowdown in life expectancy gains can be made formally rather than informally.
 * The Bayes Factor schedules can be recalculated whenever a new data release becomes available. This means that updated schedules can be produced within minutes of the release of official statistics. The commitment to do this each each new release, and to publish updated estimates of support for slowdown, should be made before such data are released. 
 * The tendency within UK populations has been for the rate of slowdown to be increasing over time, rather than to shift suddenly from one rate to another. If this continues then the proposed slowdown percentage that maximises the bayes factor will continue to shift further to the left with additional years' data, and could be maximised at a negative value (i.e. declining life expectancy rather than slowing improvement) if this tendency continues.
+
+
+Let's now compare the values that maximise the Bayes factor against the ONS population projections:
+
+| Year      | BF- female | BF- male | ONS- female | ONS- male |
+|-----------|------------|----------|-------------|-----------|
+| 2011-2012 | 0.161      | 0.276    | 0.137       | 0.148     |
+| 2011-2014 | 0.163      | 0.218    | 0.129       | 0.147     |
+| 2011-2016 | 0.088      | 0.138    | 0.115       | 0.134     |
+| 2011-2018 | 0.075      | 0.108    | 0.094       | 0.114     |
+
+
+So, up to 2014, the ONS was projecting a slower improvement rates than 2011-12 alone would suggest. 
+For the 2016 and 2018 projections, the rates were slightly higher than the Bayes Factor alone would suggest, especially for females. 
 
 
 # Scrapbook
