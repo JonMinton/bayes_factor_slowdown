@@ -583,7 +583,7 @@ dta_e0 %>%
   mutate(ch_e0 = 52.25 * ch_e0) %>% 
   ggplot(aes(x = year, y = ch_e0, group = population, colour = population, shape = population)) + 
   geom_point() + geom_line() + 
-  facet_wrap( ~ sex) + 
+  facet_wrap(sex ~ .) + 
   geom_hline(yintercept = 0) + 
   labs(
     x = "Year", y = "Annual change in life expectancy from previous year (in weeks)",
@@ -592,7 +592,7 @@ dta_e0 %>%
     caption = "Source: ONS life tables (single years)"
   ) 
 
-ggsave(here("figures", "annual_e0_ch_all_DISTINCT_uknations_ons_overlaid.png"), height = 15, width = 25, units = "cm", dpi = 300)
+ggsave(here("figures", "annual_e0_ch_all_DISTINCT_uknations_ons_overlaid.png"), height = 25, width = 25, units = "cm", dpi = 300)
 
 
 ```
@@ -1635,13 +1635,13 @@ bf_uk_nations %>%
   guides(fill = FALSE) +
   scale_x_continuous(breaks = seq(0, 100, by = 10))
 
-
+ggsave(here("figures", "bayes_factor_various_proposed_slowdown_levels.png"), height = 12, width = 12, units = "in", dpi = 300)
 ```
 
 For all populations except males in Northern Ireland, the addition of the 2018 single year life expectancy data led to sizeable increases in the empirical support for the belief that there has been a slowdown in life expectancy after 2010; this is seen by noting how much higher the bold line, which incorporates the 2018 data, is than the fainter lines representing cumulative data based on shorter series of observations. For most of these populations, the peak of the bold line is to the left of peaks based on earlier series, meaning not only did the 2018 observations increase the strength of evidence supporting belief in a slowdown in life expectancy improvements, but also suggested more severe magnitudes of slowdown than the series excluding this most recent observation had indicated. For the UK as a whole, the addition of the life expectancy data for 2018 suggested an overall slowdown of around 60% was most likely, compared with a most likely magnitude of slowdown of around 50% based on data up to 2017. 
 For each of these populations, what does the Bayes Factor maximise at? 
 
-```{r}
+```{r, echo = TRUE}
 bf_uk_nations %>% 
    filter(period == "2011-18") %>% 
    mutate(perc = 100 * perc) %>%
@@ -1665,7 +1665,7 @@ bf_uk_nations %>%
 And as a table 
 
 
-```{r}
+```{r, echo = TRUE}
 bf_uk_nations %>% 
    filter(period == "2011-18") %>% 
    mutate(perc = 100 * perc) %>%
@@ -1702,6 +1702,83 @@ Let's now compare the values that maximise the Bayes factor against the ONS popu
 
 So, up to 2014, the ONS was projecting a slower improvement rates than 2011-12 alone would suggest. 
 For the 2016 and 2018 projections, the rates were slightly higher than the Bayes Factor alone would suggest, especially for females. 
+Now, the remaining analysis (possibly the only remaining analysis) is to express the UK's recent improvmeent rates and ONS projections as a % of the mean improvement from 1980 to 2010.
+
+```{r}
+mean_lt_imp_uk <-
+  dta_e0 %>% 
+    filter(population == "United Kingdom") %>%
+    filter(between(year, 1980, 2011)) %>% 
+    group_by(sex) %>% 
+    arrange(year) %>% 
+    mutate(ch_e0 = e0 - lag(e0)) %>% 
+    summarise(
+      mean_ch_e0 = mean(ch_e0, na.rm = TRUE), 
+      var_ch_e0 = var(ch_e0, na.rm = TRUE)
+    )
+
+mean_lt_imp_uk_female <- mean_lt_imp_uk %>% filter(sex == "female") %>% pull(mean_ch_e0)
+mean_lt_imp_uk_male <- mean_lt_imp_uk %>% filter(sex == "male") %>% pull(mean_ch_e0)
+
+mean_lt_imp_uk
+
+
+```
+
+So, by 2012 the ONS was projecting future improvmeent rates that were around 30% lower (1 - 0.137 / 0.197) than long-term average improvement rates for females, and around 44% lower than long-term trends (1 - 0.148 / 0.265) for males. By contrast the Bayes Factor approach alone would predict slowdowns of around 18% for females, and gains of around 4% for males. 
+
+By 2014 the ONS was projecting slowdowns of around 35% for females, and 44% for males. This contrasts with Bayes Factor estimates of around a  
+
+```{r}
+est_as_pct_of_lt <- 
+  tribble(
+    ~Year, ~BF_female, ~BF_male, ~ONS_female, ~ONS_male,
+    "2011-12", 0.161, 0.276, 0.137, 0.148,
+    "2011-14", 0.163, 0.218, 0.129, 0.147, 
+    "2011-16", 0.088, 0.138, 0.115, 0.134, 
+    "2011-18", 0.075, 0.108, 0.094, 0.114
+  ) %>% 
+    gather(-Year, key = "method_sex", value = "ch_e0") %>% 
+    separate(method_sex, into = c("method", "sex")) %>% 
+    left_join(
+      tribble(
+        ~sex, ~lt_ch_e0,
+        "female", mean_lt_imp_uk_female,
+        "male", mean_lt_imp_uk_male
+      )
+    ) %>% 
+    mutate(
+      new_as_pct = ch_e0 / lt_ch_e0
+    ) %>% 
+    select(-ch_e0, -lt_ch_e0) 
+
+est_as_pct_of_lt %>% 
+  unite(method, sex, col = "method_sex") %>% 
+  spread(method_sex, new_as_pct) %>% 
+  kable(digits = 3) %>% 
+  kable_styling()
+
+
+```
+
+And as a graph
+
+```{r}
+est_as_pct_of_lt %>% 
+  ggplot(aes(x = Year, y = new_as_pct, group = method, shape = method, colour = method)) +
+  geom_point() + geom_line() +
+  facet_wrap(~sex) +
+  expand_limits(y = 0) + 
+  geom_hline(yintercept = 1) +
+  labs(x = "Projection Year", y = "New LT improvement as proportion of long-term trends")
+
+
+```
+
+So, it appears the ONS, and the experts who advised them, believed that the long-term improvement trends were unsustainable from 2011 onwards, and projected trends that were slower than the average improvement rates seen between 1980 and 2011. However, each successive biennial update has projected a slower rate of improvement than the previous projection. The Bayes Factor approach, with the accumulated data from 2011 to 2018, suggests the ONS projections are largely in line with recent data for males, but may still be underestimating the extent of the stalling in life expectancy gains for females.
+
+An advantage of the Bayes Factor approach is that it is trivial to update it every year, taking only a minute or so to rerun with an additional year's worth of data. This means that as soon as new data becomes available, it can be used to update our beliefs about long-term trends, and the extent of the deterioration from long-term trends if the accumulated recent data is considered representive of how long-term trends are likely to progress. 
+
 
 
 # Scrapbook
