@@ -163,16 +163,16 @@ hmd_e0 %>%
 
 ```
 
-For all mutually exclusive countries in the HMD with data since 1990 onwards, the following shows how annual life expectancy has changed over time 
+For all mutually exclusive countries in the HMD with data since 1980 onwards, the following shows how annual life expectancy has changed over time 
 
 ```{r, echo = FALSE, warning = FALSE}
 
-ch_e0_from1990_hmd <- 
+ch_e0_from1980_hmd <- 
   hmd_e0 %>% 
     left_join(code_lookup, by = c("country" = "code")) %>% 
     filter(include == 1) %>% 
     filter(!(country %in% c("KOR", "HRV","CHL"))) %>% 
-    filter(year >= 1989) %>% 
+    filter(year >= 1980) %>% 
     filter(sex != "total") %>% 
     group_by(label, sex) %>% 
     arrange(year) %>% 
@@ -180,7 +180,7 @@ ch_e0_from1990_hmd <-
     ungroup() %>% 
     write_to_table(here("tables", "change_e0_hmd_from1990.csv")) 
 
-ch_e0_from1990_hmd %>% 
+ch_e0_from1980_hmd %>% 
   filter(!is.na(ch_e0)) %>% 
   ggplot(aes(x = year, y = ch_e0)) + 
   geom_point() + facet_wrap(~sex) +
@@ -196,10 +196,11 @@ ch_e0_from1990_hmd %>%
 ```{r echo=FALSE, fig.height=10, fig.width=10, warning = FALSE}
 
 mean_ch_e0_decade_hmd <- 
-  ch_e0_from1990_hmd %>% 
+  ch_e0_from1980_hmd %>% 
     filter(!is.na(ch_e0)) %>% 
     mutate(
       decade = case_when(
+        between(year, 1980, 1989)      ~ "1980s",
         between(year, 1990, 1999)      ~ "1990s",
         between(year, 2000, 2009)      ~ "2000s",
         between(year, 2010, 2020)      ~ "2010s",
@@ -240,10 +241,11 @@ ggsave(here("figures", "mean_ch_e0_decade.png"), height = 30, width = 30, units 
 
 ```{r, warning = FALSE, echo = FALSE}
 mean_ch_e0_decade_hmd <- 
-  ch_e0_from1990_hmd %>% 
+  ch_e0_from1980_hmd %>% 
     filter(!is.na(ch_e0)) %>% 
     mutate(
       decade = case_when(
+        between(year, 1980, 1989)      ~ "1980s",
         between(year, 1990, 1999)      ~ "1990s",
         between(year, 2000, 2009)      ~ "2000s",
         between(year, 2010, 2020)      ~ "2010s",
@@ -268,11 +270,12 @@ mean_ch_e0_decade_hmd %>%
   rename(Country = label) %>% 
   mutate(mean_ch_e0 = round(mean_ch_e0, 3)) %>% 
   spread(sex_decade, mean_ch_e0) %>%
-  set_names(nm = c("Country", rep(c("1990s", "2000s", "2010s"), 2))) %>% 
+  set_names(nm = c("Country", rep(c("1980s", "1990s", "2000s", "2010s"), 2))) %>% 
   kable() %>% 
   kable_styling() %>% 
-  add_header_above(c(" ", "Female" = 3, "Male" = 3)) %>% 
-  footnote(general = "Average annual change in life expectancy by decade, sex, and country")
+  add_header_above(c(" ", "Female" = 4, "Male" = 4)) %>% 
+  footnote(general = "Average annual change in life expectancy by decade, sex, and country\n
+           NA: Not Available")
 
 ```
 
@@ -280,12 +283,12 @@ The countries with the fastest average improvement in $e_0$ in the 2010s include
 
 The similarity between average rates of improvement in the 2010s in Germany and the UK is noteworthy with average sex specific improvement rates within 0.01 years per year of each other (0.09 compared with 0.10 for females in the UK and Germany respectively; 0.16 compared with 0.17 for males). The German data covers 2010-2017 inclusive, whereas for the UK the data extends to 2016. 
 
-### 1.2.1.3 Annual change in slow gainers since 1990
+### 1.2.1.3 Annual change in slow gainers since 1980
 
 There are some important differences, however, in how annual change rates have varied in the the slowest-improving countries. Figure X shows this for the five slowest-improving countries excluding Iceland, which due to its small population size shows much greater levels of annual variability than the other countries. From this figure it is apparent that the USA not only tended to show lower rates of improvement before 2010, but has also been exhibiting continuing and more persistent declines than the other countries, with three consecutive years of declining mortality for males in the last three available years, and only modest improvements for females.   
 
 ```{r echo=FALSE, fig.height=8, fig.width=8, warning = FALSE}
-ch_e0_from1990_hmd %>% 
+ch_e0_from1980_hmd %>% 
   filter(sex != "total") %>% 
   filter(country %in% c("DEUTNP", "NLD", "USA", "GBR_NP")) %>% 
   group_by(label, sex) %>%
@@ -487,9 +490,11 @@ As expected, the ONS and HMD estimates of mean improvement per decade are closel
 
 | sex | decade | HMD   | ONS   |
 |-----|--------|-------|-------|
+| f   | 80s    | 0.168 | 0.168 |
 | f   | 90s    | 0.168 | 0.170 |
 | f   | 00s    | 0.244 | 0.241 |
 | f   | 10s    | 0.091 | 0.080 |
+| m   | 80s    | 0.229 | 0.230 |
 | m   | 90s    | 0.229 | 0.232 |
 | m   | 00s    | 0.319 | 0.313 |
 | m   | 10s    | 0.164 | 0.131 |
@@ -592,7 +597,7 @@ ggsave(here("figures", "annual_e0_ch_all_DISTINCT_uknations_ons_overlaid.png"), 
 
 ```
 
-There are clear similarities between the trends in each of the UK nations, again with the exception of Northern Ireland. The trends even seem to correspond in terms of which years are 'good years' and which years are 'bad years' (i.e. they oscillate in phase with each other). To check this let's look at the correlation between the trends 
+There are clear similarities between the trends in each of the UK nations, again with the exception of Northern Ireland. The trends even seem to correspond in terms of which years are 'good years' and which years are 'bad years' (i.e. they oscillate in phase with each other). To check this let's look at the correlation between the trends. 
 
 ```{r, warning = FALSE}
 corrs_trends <- 
@@ -1436,11 +1441,14 @@ ons_projections_summarised
 
 At this point let's compare the ONS projections against the historic values observed since 1990
 
+
 | sex | decade | HMD   | ONS   |
 |-----|--------|-------|-------|
+| f   | 80s    | 0.168 | 0.168 |
 | f   | 90s    | 0.168 | 0.170 |
 | f   | 00s    | 0.244 | 0.241 |
 | f   | 10s    | 0.091 | 0.080 |
+| m   | 80s    | 0.229 | 0.230 |
 | m   | 90s    | 0.229 | 0.232 |
 | m   | 00s    | 0.319 | 0.313 |
 | m   | 10s    | 0.164 | 0.131 |
@@ -1451,6 +1459,29 @@ At this point let's compare the ONS projections against the historic values obse
 | m   | 0.148 | 0.147 | 0.134 | 0.114 |
 
 So, the projections have all assumed that the rates of improvement observed in the 2000s are not sustainable in the long term, but have been downrated by around a third from 2012 to 2018 for females, and by around a fifth from 2012 to 2018 for males. Assumed rates of improvement are around 17.5% higher than observed in the 2010s for females, and around 13% higher than observed in the 2010s for males. 
+
+To put more simply: the 2012 ONS projection assumed the rate of improvement would be the midpoint between the 1990 and 2010-11 rates, and subsequent projections have tended increasingly towards the post 2010 improvement levels. They have largely been responsive to the new and much slowed life expectancy gains. 
+
+
+The before period used in the Bayes Factor calculations before is 1991 onwards. Let's identify what the average improvement was over this period. 
+
+```{r}
+dta_e0 %>% 
+  filter(population == "United Kingdom") %>% 
+  filter(between(year, 1990, 2010)) %>% 
+  group_by(sex) %>% 
+  arrange(year) %>% 
+  mutate(ch_e0 = e0 - lag(e0)) %>% 
+  filter(!is.na(ch_e0)) %>% 
+  summarise(mean_ch_e0  = mean(ch_e0), var_ch_e0 = var(ch_e0)) %>% 
+  kable(digits = 3) %>% 
+  kable_styling() 
+
+```
+
+This checks out with what I've calculated before. (Phew!)
+
+
 
 
 
