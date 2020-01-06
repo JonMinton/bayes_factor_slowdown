@@ -707,9 +707,13 @@ Note that consecutive random numbers cannot be used, as for some random numbers 
 
 Let's pull the 1 breakpoint estimates 
 
-```{r, warning = FALSE, echo = FALSE}
+```{r, warning = FALSE, echo = FALSE, eval = FALSE}
 get_brks <- function(x){
-  tryCatch(summary(x)$psi[,2], finally = NULL)
+  if ("segmented" %in% class(x)){
+    warning("Output not of class 'segmented'")
+    return(NULL)
+  }
+  tryCatch(summary(x)$psi[,2], finally = NA_real_)
 }
 
 datablocks %>% 
@@ -726,6 +730,8 @@ datablocks %>%
   )
 
 ```
+
+* *Note*: For some reason this currentl doesn't run. I'm not sure of the reasons so this needs to be fixed at some point. 
 
 
 This shows that 1 breakpoint models can be identified for each population, but 2 and 3 breakpoint models only for some populations. For almost all populations, except Northern Ireland, the breakpoint is identified as around 2009 (so the change from 2009 to 2010)
