@@ -12,7 +12,8 @@ output:
 # Prep preamble 
 
 ```{r, echo = FALSE, warning = FALSE}
-pacman::p_load(tidyverse, here, changepoint, segmented, ggrepel, knitr, kableExtra, HMDHFDplus, corrr, readxl)
+pacman::p_load(tidyverse, here, changepoint, segmented, ggrepel, knitr, kableExtra, HMDHFDplus, corrr, readxl,
+               openxlsx)
 
 ```
 
