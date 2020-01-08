@@ -1,0 +1,117 @@
+---
+title: "Trying openxlsx with tables"
+output: html_notebook
+---
+
+This document will try to write formatted tables as worksheets in excel using `openxlsx` and `kable`/`kableExtra`.
+
+```{r}
+pacman::p_load(openxlsx, tidyverse, kableExtra)
+
+```
+
+Let's use some default datasets
+
+```{r}
+data("ChickWeight")
+chickwts <- as_tibble(chickwts)
+```
+
+```{r}
+
+basic_table <- 
+  chickwts %>% 
+    group_by(feed) %>% 
+    summarise(mean_wt = mean(weight), 
+              sd_wt   = sd(weight),
+              min_wt  = min(weight),
+              max_wt  = max(weight),
+              n_obs   = n()
+    ) %>% 
+    ungroup()
+
+basic_table
+```
+
+Write out the basic table 
+
+
+```{r}
+wb <- openxlsx::createWorkbook()
+
+wb %>% addWorksheet(sheetName = "basic_table")
+wb %>% writeData(sheet = "basic_table", x = basic_table)
+
+saveWorkbook(wb, file = here("bayes_paper", "tables", "test_workbook.xlsx"), overwrite = TRUE)
+
+```
+
+This works. Now to see what happens when the object created is a formatted table 
+
+```{r}
+fancy_table <- 
+  basic_table %>% 
+    kable() %>% 
+    kable_styling() 
+  
+fancy_table
+
+```
+
+```{r}
+wb <- openxlsx::createWorkbook()
+
+wb %>% addWorksheet(sheetName = "basic_table")
+wb %>% writeData(sheet = "basic_table", x = basic_table)
+
+wb %>% addWorksheet(sheetName = "fancy_table")
+wb %>% writeData(sheet = "fancy_table", x = fancy_table)
+
+
+saveWorkbook(wb, file = here("bayes_paper", "tables", "test_workbook.xlsx"), overwrite = TRUE)
+
+```
+
+So, this doesn't work. Instead let's first look at `writeDataTable`, then at formatting efficiently 
+
+```{r}
+wb <- openxlsx::createWorkbook()
+
+wb %>% addWorksheet(sheetName = "basic_table")
+wb %>% writeData(sheet = "basic_table", x = basic_table)
+
+wb %>% addWorksheet(sheetName = "basic_datatable")
+wb %>% writeData(sheet = "basic_datatable", x = basic_table)
+
+
+saveWorkbook(wb, file = here("bayes_paper", "tables", "test_workbook.xlsx"), overwrite = TRUE)
+
+
+```
+
+
+No obvious advantges to this, but can see the `mergeCells` option, so let's think about how to use that 
+
+```{r}
+make_fake_mtrx <- function(x){
+  tmp <- matrix(nrow = 0, ncol = length(x))
+  colnames(tmp) <- x
+  tmp
+}
+
+wb <- openxlsx::createWorkbook()
+
+wb %>% addWorksheet(sheetName = "basic_table")
+wb %>% writeData(sheet = "basic_table", x = basic_table, startRow = 2)
+wb %>% mergeCells(sheet = "basic_table", rows = 1, cols = 2:5)
+wb %>% writeData(sheet = "basic_table", x = make_fake_mtrx(c(" ",rep("Weight", 4), "N")))
+
+
+saveWorkbook(wb, file = here("bayes_paper", "tables", "test_workbook.xlsx"), overwrite = TRUE)
+
+
+
+```
+
+This approach isn't pretty, but it works...
+

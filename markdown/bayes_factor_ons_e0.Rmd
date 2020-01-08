@@ -242,6 +242,14 @@ ggsave(here("figures", "mean_ch_e0_decade.png"), height = 30, width = 30, units 
 
 
 ```{r, warning = FALSE, echo = FALSE}
+
+make_fake_mtrx <- function(x){
+  tmp <- matrix(nrow = 0, ncol = length(x))
+  colnames(tmp) <- x
+  tmp
+}
+
+
 mean_ch_e0_decade_hmd <- 
   ch_e0_from1980_hmd %>% 
     filter(!is.na(ch_e0)) %>% 
@@ -258,7 +266,7 @@ mean_ch_e0_decade_hmd <-
     summarise(mean_ch_e0 = mean(ch_e0, na.rm = TRUE)) %>% 
     ungroup() 
 
-
+wide_table <-
 mean_ch_e0_decade_hmd %>% 
   left_join(
     mean_ch_e0_decade_hmd %>% filter(decade == "2010s") %>% 
@@ -272,7 +280,37 @@ mean_ch_e0_decade_hmd %>%
   rename(Country = label) %>% 
   mutate(mean_ch_e0 = round(mean_ch_e0, 3)) %>% 
   spread(sex_decade, mean_ch_e0) %>%
-  set_names(nm = c("Country", rep(c("1980s", "1990s", "2000s", "2010s"), 2))) %>% 
+  set_names(nm = c("Country", rep(c("1980s", "1990s", "2000s", "2010s"), 2))) 
+
+# write to excel 
+
+wb <- openxlsx::createWorkbook()
+wb %>% addWorksheet(sheetName = "hmd_countries_decade")
+wb %>% writeData(sheet = "hmd_countries_decade", x = wide_table, startRow = 2)
+wb %>% mergeCells(sheet = "hmd_countries_decade", rows = 1, cols = 2:5)
+wb %>% mergeCells(sheet = "hmd_countries_decade", rows = 1, cols = 6:9)
+wb %>% writeData(sheet = "hmd_countries_decade", x = make_fake_mtrx(c(" ",rep("Female", 4), rep("Male", 4))))
+wb %>% addStyle(sheet = "hmd_countries_decade", rows = 1, cols = 1:9, 
+                style = createStyle(textDecoration = "bold", halign = "center")
+  )
+wb %>% addStyle(sheet = "hmd_countries_decade", rows = 2, cols = 1:9, 
+                style = createStyle(border = "bottom")
+  )
+wb %>% addStyle(sheet = "hmd_countries_decade", rows = 3:39, cols = 2:9, gridExpand = TRUE, 
+                style = createStyle(numFmt = "0.000")
+  )
+wb %>% setColWidths(sheet = "hmd_countries_decade", cols = 1, widths = "auto"
+  )
+wb %>% addStyle(sheet = "hmd_countries_decade", rows = 2:39, cols = 2, stack = TRUE,
+                style = createStyle(border = "left")
+  )
+
+
+
+saveWorkbook(wb, file = here("bayes_paper", "tables", "hmd_countries_decade.xlsx"), overwrite = TRUE)
+
+
+wide_table %>% 
   kable() %>% 
   kable_styling() %>% 
   add_header_above(c(" ", "Female" = 4, "Male" = 4)) %>% 
