@@ -274,7 +274,8 @@ mean_ch_e0_decade_hmd %>%
       select(-mean_ch_e0, -decade) 
   ) %>% 
   mutate(decade = fct_rev(decade)) %>% 
-  arrange(desc(ch_last)) %>% 
+  arrange(desc(ch_last)) %>%
+  mutate(label = fct_reorder(label, ch_last)) %>% 
   select(-ch_last) %>% 
   unite(col = "sex_decade", sex, decade) %>%
   rename(Country = label) %>% 
@@ -471,8 +472,9 @@ dta_e0 %>%
   arrange(year) %>% 
   mutate(ch_e0 = e0 - lag(e0)) %>% 
   ungroup() %>% 
+  filter(population %in% c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")) %>% 
   mutate(
-    population = fct_relevel(population, c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland"))
+    population = fct_relevel(population, c("United Kingdom","England", "Scotland", "Wales", "Northern Ireland"))
   ) %>% 
   mutate(ch_e0 = 52.25 * ch_e0) %>% 
   ggplot(aes(x = year, y = ch_e0)) + 
@@ -504,8 +506,9 @@ ons_ch_e0_decade <-
     arrange(year) %>% 
     mutate(ch_e0 = e0 - lag(e0)) %>% 
     ungroup() %>% 
+    filter(population %in% c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")) %>% 
     mutate(
-      population = fct_relevel(population, c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland"))
+      population = fct_relevel(population, c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"))
     ) %>% 
     filter(!is.na(ch_e0)) %>% 
     select(-e0) %>% 
@@ -523,6 +526,51 @@ ons_ch_e0_decade <-
     ungroup() 
 
 ons_ch_e0_decade
+
+```
+
+```{r}
+make_fake_mtrx <- function(x){
+  tmp <- matrix(nrow = 0, ncol = length(x))
+  colnames(tmp) <- x
+  tmp
+}
+
+wide_table <- 
+  ons_ch_e0_decade %>% 
+    unite(col = "sex_decade", sex, decade) %>% 
+    spread(sex_decade, mean_ch_e0) %>% 
+    set_names(., nm = c("Population", rep(c("1980s", "1990s", "2000s", "2010s"), 2)))
+
+
+# write to excel 
+
+wb <- openxlsx::createWorkbook()
+wb %>% addWorksheet(sheetName = "ons_countries_decade")
+wb %>% writeData(sheet = "ons_countries_decade", x = wide_table, startRow = 2)
+wb %>% mergeCells(sheet = "ons_countries_decade", rows = 1, cols = 2:5)
+wb %>% mergeCells(sheet = "ons_countries_decade", rows = 1, cols = 6:9)
+wb %>% writeData(sheet = "ons_countries_decade", x = make_fake_mtrx(c(" ",rep("Female", 4), rep("Male", 4))))
+wb %>% addStyle(sheet = "ons_countries_decade", rows = 1, cols = 1:9, 
+                style = createStyle(textDecoration = "bold", halign = "center")
+  )
+wb %>% addStyle(sheet = "ons_countries_decade", rows = 2, cols = 1:9, 
+                style = createStyle(border = "bottom")
+  )
+wb %>% addStyle(sheet = "ons_countries_decade", rows = 3:7, cols = 2:9, gridExpand = TRUE, 
+                style = createStyle(numFmt = "0.000")
+  )
+wb %>% setColWidths(sheet = "ons_countries_decade", cols = 1, widths = "auto"
+  )
+wb %>% addStyle(sheet = "ons_countries_decade", rows = 2:7, cols = 2, stack = TRUE,
+                style = createStyle(border = "left")
+  )
+
+
+
+saveWorkbook(wb, file = here("bayes_paper", "tables", "ons_countries_decade.xlsx"), overwrite = TRUE)
+
+
 
 ```
 
@@ -796,8 +844,9 @@ datablocks %>%
     brk_lwr = brk_year - 2 * brk_se, 
     brk_upr = brk_year + 2 * brk_se
   ) %>% 
+  filter(population %in% c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")) %>% 
   mutate(
-    population = fct_relevel(population, rev(c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland")))
+    population = fct_relevel(population, rev(c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")))
   ) %>% 
   ggplot(aes(x = brk_year, y = population)) + 
   geom_point() + 
@@ -822,110 +871,66 @@ ggsave(here("figures", "breakpoint_uk_allgroups.png"), height = 15, width = 25, 
 This shows a lot of consistency in estimates of when the breakdown occurred. With the exception of Northern Ireland, we can use 2010 afterwards as 'post-slowdown', and the years from 1980 onwards as 'pre-slowdown'.
 
 ```{r, warning = FALSE, echo = FALSE}
-datablocks %>% 
-  ungroup() %>% 
-  mutate(
-    segmod_1brk  = segmods_1brk
-  ) %>% 
-  mutate(
-    brk_year = map_dbl(segmod_1brk, ~summary(.x)$psi[2]),
-    brk_se   = map_dbl(segmod_1brk, ~summary(.x)$psi[3])
-  ) %>% 
-  select(population, sex, brk_year, brk_se) %>% 
-  mutate(
-    brk_lwr = brk_year - 2 * brk_se, 
-    brk_upr = brk_year + 2 * brk_se
-  ) %>% 
-  mutate(
-    population = fct_relevel(population, rev(c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland")))
-  ) %>% 
-  rename(
-    Population = population,
-    Sex = sex, 
-    Breakpoint = brk_year, 
-    SE         = brk_se,
-    `Lower CI` = brk_lwr, `Upper CI` = brk_upr
-  ) %>% 
-  mutate_if(is.numeric, ~round(., 2)) %>% 
-  kable() %>% 
-  kable_styling() 
+
+make_fake_mtrx <- function(x){
+  tmp <- matrix(nrow = 0, ncol = length(x))
+  colnames(tmp) <- x
+  tmp
+}
+
+
+
+wide_table <-
+  datablocks %>% 
+    ungroup() %>% 
+    mutate(
+      segmod_1brk  = segmods_1brk
+    ) %>% 
+    mutate(
+      brk_year = map_dbl(segmod_1brk, ~summary(.x)$psi[2]),
+      brk_se   = map_dbl(segmod_1brk, ~summary(.x)$psi[3])
+    ) %>% 
+    select(population, sex, brk_year, brk_se) %>% 
+    mutate(
+      brk_lwr = brk_year - 2 * brk_se, 
+      brk_upr = brk_year + 2 * brk_se
+    ) %>% 
+    filter(population %in% c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")) %>% 
+    mutate(
+      population = fct_relevel(population, rev(c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")))
+    ) %>% 
+    rename(
+      Population = population,
+      Sex = sex, 
+      Breakpoint = brk_year, 
+      `Standard Error` = brk_se,
+      `Lower CI` = brk_lwr, `Upper CI` = brk_upr
+    ) 
+
+ 
+ wb <- openxlsx::createWorkbook()
+ wb %>% addWorksheet(sheetName = "uk_breakpoint")
+ wb %>% writeData(sheet = "uk_breakpoint", x = wide_table, startRow = 1)
+ wb %>% addStyle(sheet = "uk_breakpoint", rows = 1, cols = 1:6, 
+                 style = createStyle(textDecoration = "bold")
+   )
+wb %>% addStyle(sheet = "uk_breakpoint", rows = 1, cols = 1:6, stack = TRUE,
+                style = createStyle(border = "bottom")
+  )
+wb %>% addStyle(sheet = "uk_breakpoint", rows = 1:11, cols = 3, stack = TRUE,
+                style = createStyle(border = "left")
+  )
+wb %>% addStyle(sheet = "uk_breakpoint", rows = 2:11, cols = 3:6, gridExpand = TRUE, stack = TRUE,
+                style = createStyle(numFmt = "0.00")
+  )
+ wb %>% setColWidths(sheet = "uk_breakpoint", cols = 1:6, widths = "auto"
+   )
+# 
+ saveWorkbook(wb, file = here("bayes_paper", "tables", "uk_breakpoint.xlsx"), overwrite = TRUE)
+
 ```
 
-#### 2.2.4.3 Breakpoint figure - mutually exclusive UK nations
 
-The following shows the breakpoints and standard errors.
-
-
-```{r, warning = FALSE, echo = FALSE}
-datablocks %>% 
-  ungroup() %>% 
-  mutate(
-    segmod_1brk  = segmods_1brk
-  ) %>% 
-  mutate(
-    brk_year = map_dbl(segmod_1brk, ~summary(.x)$psi[2]),
-    brk_se   = map_dbl(segmod_1brk, ~summary(.x)$psi[3])
-  ) %>% 
-  select(population, sex, brk_year, brk_se) %>% 
-  mutate(
-    brk_lwr = brk_year - 2 * brk_se, 
-    brk_upr = brk_year + 2 * brk_se
-  ) %>% 
-  filter(population %in% c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")) %>% 
-  mutate(
-    population = fct_relevel(population, rev(c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")))
-  ) %>% 
-  ggplot(aes(x = brk_year, y = population)) + 
-  geom_point() + 
-  geom_errorbarh(aes(xmin = brk_lwr, xmax=brk_upr), height = 0.2) + 
-  facet_wrap(~sex) + 
-  geom_vline(xintercept = 2018) + 
-  labs(
-    x = "Year", 
-    y = "Population",
-    title = "Estimates of breakpoint years from one breakpoint models",
-    subtitle = "Error bars show two standard errors around estimate",
-    caption = "Source: ONS Single Year Lifetables"
-  
-  ) + 
-  theme_light()
-
-ggsave(here("figures", "breakpoint_uk_allcountries.png"), height = 15, width = 25, units = "cm", dpi = 300)
-```
-
-#### 2.2.4.2 Breakpoint table
-
-This shows a lot of consistency in estimates of when the breakdown occurred. With the exception of Northern Ireland, we can use 2010 afterwards as 'post-slowdown', and the years from 1980 onwards as 'pre-slowdown'.
-
-```{r, warning = FALSE, echo = FALSE}
-datablocks %>% 
-  ungroup() %>% 
-  mutate(
-    segmod_1brk  = segmods_1brk
-  ) %>% 
-  mutate(
-    brk_year = map_dbl(segmod_1brk, ~summary(.x)$psi[2]),
-    brk_se   = map_dbl(segmod_1brk, ~summary(.x)$psi[3])
-  ) %>% 
-  select(population, sex, brk_year, brk_se) %>% 
-  mutate(
-    brk_lwr = brk_year - 2 * brk_se, 
-    brk_upr = brk_year + 2 * brk_se
-  ) %>% 
-  mutate(
-    population = fct_relevel(population, rev(c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland")))
-  ) %>% 
-  rename(
-    Population = population,
-    Sex = sex, 
-    Breakpoint = brk_year, 
-    SE         = brk_se,
-    `Lower CI` = brk_lwr, `Upper CI` = brk_upr
-  ) %>% 
-  mutate_if(is.numeric, ~round(., 2)) %>% 
-  kable() %>% 
-  kable_styling() 
-```
 
 #### 2.2.4.2 Effect of different random number seeds on breakpoint
 
@@ -947,11 +952,15 @@ datablocks %>%
     brk_year = map_dbl(model, ~summary(.x)$psi[2]),
     brk_sd   = map_dbl(model, ~summary(.x)$psi[3])
   ) %>% 
+  filter(population %in% c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")) %>% 
+  mutate(population = fct_rev(fct_relevel(population, "United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"))) %>% 
   ggplot(aes(x = brk_year, y = population, group = seed, shape = seed, colour = seed)) + 
   geom_point() +
-  facet_wrap(~sex)
+  facet_wrap(~sex) + 
+  labs(x = "Breakpoint estimate", y = "Population", 
+       title = "Effect of random number seed on breakpoint estimate")
   
-
+ggsave(here("bayes_paper", "figures", "R3A01_Randomnumberseed.png"), height = 10, width = 15, units = "cm", dpi = 300)
 ```
 Break point years, where they can be calculated, are largely identical. They confirm 2010 as a reasonable breakpoint year except for Northern Ireland. 
 
@@ -1313,7 +1322,112 @@ ons_projections_tidied <- read_rds(here("data", "ons_projections", "all_tidied.r
 
 ```
 
+## OLDER projections 
+
+There was a report showing how pre 2012 ONS projections compared. Let's get the data and visualise too. 
+
+The underlying data is available [here](https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationprojections/adhocs/006372nationalpopulationprojectionsaccuracyreportunderlyingdatauk1966to2030), and the link to the excel file itself is [here](https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/populationandmigration/populationprojections/adhocs/006372nationalpopulationprojectionsaccuracyreportunderlyingdatauk1966to2030/eolsforfigures12and13nppaccuracyreport.xls). 
+
+Let's download this file to a sensible place 
+
+```{r, echo = TRUE, eval = FALSE}
+download.file(
+  url = "https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/populationandmigration/populationprojections/adhocs/006372nationalpopulationprojectionsaccuracyreportunderlyingdatauk1966to2030/eolsforfigures12and13nppaccuracyreport.xls",
+  destfile = here("data", "ons_projections", "historic_comparison.xls"),
+  mode = "wb"
+)
+
+
+
+```
+
+The data requires a bit of tidying...
+
+```{r}
+#males
+older_projns <- 
+  bind_rows(
+    read_excel(path = here("data", "ons_projections", "historic_comparison.xls"), sheet = "Data",range = "A2:BO26") %>% 
+      slice(-1) %>% 
+      select(-1) %>% 
+      rename(projection = ...2) %>% 
+      gather(-projection, key = "year", value = "e0") %>% 
+      filter(!is.na(e0)) %>% 
+      mutate(sex = "male") %>% 
+      select(sex, projection, year, e0),
+    read_excel(path = here("data", "ons_projections", "historic_comparison.xls"), sheet = "Data",range = "A30:BO54") %>% 
+        slice(-1) %>% 
+        select(-1) %>% 
+        rename(projection = ...2) %>% 
+        gather(-projection, key = "year", value = "e0") %>% 
+        filter(!is.na(e0)) %>% 
+        mutate(sex = "female") %>% 
+        select(sex, projection, year, e0)
+  )  %>% 
+  mutate(year = as.numeric(year)) %>% 
+  bind_rows( # more recent data
+    dta_e0 %>% 
+      filter(population == "United Kingdom") %>% 
+      filter(year > 2012) %>% 
+      mutate(projection = "Actual") %>% 
+      select(sex, projection, year, e0) 
+  )
+
+
+older_projns
+
+
+
+
+```
+
+visualise 
+
+```{r}
+older_projns %>% 
+  filter(projection != "Actual") %>% 
+  ggplot(aes(x = year, y = e0, group = projection, colour= projection)) + 
+  geom_line() + 
+  facet_wrap(~sex) + 
+  geom_line(aes(x = year, y = e0), size = 1.2, inherit.aes = FALSE, data = older_projns %>% filter(projection == "Actual")) +
+  labs(x = "Year", y = "Life expectancy at birth in years", title = "Life expectancy projections, 1971-2012")
+
+```
+
+To this, let's add the more recent projections 
+
+```{r}
+
+older_projns %>% 
+  filter(projection != "Actual") %>% 
+  bind_rows(
+    ons_projections_tidied %>% 
+      filter(age == 0) %>% 
+      filter(year >= 2010) %>% 
+      mutate(proj_year = factor(proj_year)) %>% 
+      mutate(sex = case_when(
+        sex == 'm'   ~ 'male',
+        sex == 'f'   ~ 'female',
+        TRUE         ~ NA_character_
+      )) %>% 
+      filter(country == "UK") %>% 
+      select(sex, projection = proj_year, year, e0 = ex) %>% 
+      mutate(projection = as.character(projection) %>% paste(., " proj")) %>% 
+      filter(projection != "2012")
+  ) %>% 
+  filter(year <= 2040) %>% 
+  ggplot(aes(x = year, y = e0, group = projection, colour= projection)) + 
+  geom_line() + 
+  facet_wrap(~sex) + 
+  geom_line(aes(x = year, y = e0), size = 1.2, inherit.aes = FALSE, data = older_projns %>% filter(projection == "Actual")) +
+  labs(x = "Year", y = "Life expectancy at birth in years", title = "Life expectancy projections, 1971-2018")
+
+ggsave(here("bayes_paper", "figures", "R4_01_projections1971_2018.png"), height = 15, width = 20, units = "cm", dpi = 300)
+```
+
+
 ## 3.2 Visualise projections 
+
 
 ### 3.2.1 Change in projections 
 
@@ -1325,7 +1439,12 @@ ons_projections_tidied %>%
   filter(age == 0) %>% 
   filter(year >= 2010) %>% 
   mutate(proj_year = factor(proj_year)) %>% 
-  mutate(country = factor(country, levels = c("UK", "England", "Northern Ireland", "Scotland", "Wales"))) %>% 
+  mutate(sex = case_when(
+    sex == 'm'   ~ 'male',
+    sex == 'f'   ~ 'female',
+    TRUE         ~ NA_character_
+  )) %>% 
+  mutate(country = factor(country, levels = c("UK", "England", "Scotland", "Wales", "Northern Ireland"))) %>% 
   ggplot(aes(x = year, y = ex, group = proj_year, colour = proj_year)) + 
   facet_grid(country ~ sex) +
   geom_line() +
@@ -1335,7 +1454,8 @@ ons_projections_tidied %>%
     colour = "ONS Projection\nYear"
   ) 
 
-ggsave(here("figures", "ons_life_expectancy_projections.png"), height = 25, width = 20, units = "cm", dpi = 300)
+ggsave(here("figures", "ons_life_expectancy_projections.png"), height = 25, width = 25, units = "cm", dpi = 300)
+ggsave(here("bayes_paper", "figures", "R4A01_ons_life_expectancy_projections.png"), height = 25, width = 25, units = "cm", dpi = 300)
   
 
 ```
@@ -1375,7 +1495,7 @@ So, the projections involve adding varying numbers of increments of 0.1 life exp
 ```{r}
 ons_projections_tidied %>%
   filter(sex == "m") %>%
-  mutate(country = factor(country, levels = c("UK", "England", "Wales", "Scotland", "Northern Ireland"))) %>% 
+  mutate(country = factor(country, levels = c("UK", "England", "Scotland","Wales", "Northern Ireland"))) %>% 
   mutate(proj_year = factor(proj_year)) %>% 
   ggplot(aes(x = year, y = age, fill = ex)) + 
   geom_tile() + 
@@ -1395,7 +1515,7 @@ ggsave(here("figures", "ons_projections_lexis_males.png"), height = 30, width = 
 ```{r}
 ons_projections_tidied %>%
   filter(sex == "f") %>%
-  mutate(country = factor(country, levels = c("UK", "England", "Wales", "Scotland", "Northern Ireland"))) %>% 
+  mutate(country = factor(country, levels = c("UK", "England",  "Scotland", "Wales", "Northern Ireland"))) %>% 
   mutate(proj_year = factor(proj_year)) %>% 
   ggplot(aes(x = year, y = age, fill = ex)) + 
   geom_tile() + 
@@ -1404,7 +1524,7 @@ ons_projections_tidied %>%
   facet_grid(country ~ proj_year) + 
   labs(
     x= "Year", y = "Age in years", 
-    title = "Projected life expectancy by ONS projection year and country, Females"
+    title = "Females, Projected life expectancy by ONS projection year and country"
   )
 
 ggsave(here("figures", "ons_projections_lexis_females.png"), height = 30, width = 25, units = "cm", dpi = 300)
@@ -1421,7 +1541,7 @@ ons_projections_tidied %>%
   mutate(ch_ex_proj = ex - lag(ex)) %>% 
   filter(!is.na(ch_ex_proj)) %>% 
   ungroup() %>% 
-  mutate(country = factor(country, levels = c("UK", "England", "Wales", "Scotland", "Northern Ireland"))) %>% 
+  mutate(country = factor(country, levels = c("UK", "England", "Scotland", "Wales","Northern Ireland"))) %>% 
   filter(year >= 2020) %>% 
   filter(sex == "m") %>% 
   ggplot(aes(x = year, age, fill = ch_ex_proj)) + 
@@ -1431,7 +1551,7 @@ ons_projections_tidied %>%
   scale_fill_distiller(palette = "RdBu", limits = c(-1.5, 1.5)) + 
   labs(
     x = "Year", y = "Age in years", fill = "Change in ex",
-    title = "Change in conditional life expectancy from previous ONS projection, male"
+    title = "Males, change in conditional life expectancy projection"
   ) +
   theme(axis.text.x = element_text(angle = 90))
 
@@ -1444,7 +1564,7 @@ ons_projections_tidied %>%
   mutate(ch_ex_proj = ex - lag(ex)) %>% 
   filter(!is.na(ch_ex_proj)) %>% 
   ungroup() %>% 
-  mutate(country = factor(country, levels = c("UK", "England", "Wales", "Scotland", "Northern Ireland"))) %>% 
+  mutate(country = factor(country, levels = c("UK", "England", "Scotland", "Wales", "Northern Ireland"))) %>% 
   filter(year >= 2020) %>% 
   filter(sex == "f") %>% 
   ggplot(aes(x = year, age, fill = ch_ex_proj)) + 
@@ -1454,7 +1574,7 @@ ons_projections_tidied %>%
   scale_fill_distiller(palette = "RdBu", limits = c(-1.5, 1.5)) + 
   labs(
     x = "Year", y = "Age in years", fill = "Change in ex",
-    title = "Change in conditional life expectancy from previous ONS projection, female"
+    title = "Females, change in conditional life expectancy projection"
   ) +
   theme(axis.text.x = element_text(angle = 90))
 
