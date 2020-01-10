@@ -1412,8 +1412,8 @@ older_projns %>%
       )) %>% 
       filter(country == "UK") %>% 
       select(sex, projection = proj_year, year, e0 = ex) %>% 
-      mutate(projection = as.character(projection) %>% paste(., " proj")) %>% 
-      filter(projection != "2012")
+      mutate(projection = as.character(projection) %>% paste(., "proj")) %>% 
+      filter(projection != "2012 proj")
   ) %>% 
   filter(year <= 2040) %>% 
   ggplot(aes(x = year, y = e0, group = projection, colour= projection)) + 
