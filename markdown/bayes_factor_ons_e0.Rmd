@@ -1604,6 +1604,54 @@ ons_projections_summarised <-
 ons_projections_summarised
 ```
 
+```{r}
+table_wide <- 
+  ons_projections_summarised %>%
+    ungroup() %>% 
+    mutate(Sex = case_when(
+      sex == 'f'    ~ 'Female',
+      sex == 'm'    ~ 'Male',
+      TRUE          ~ NA_character_
+    )) %>% 
+    rename(Country = country) %>% 
+    mutate(Country = ifelse(Country == "UK", "United Kingdom", Country)) %>%
+    mutate(Country = factor(Country, levels = c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"))) %>%
+    unite(Sex, proj_year, col = "sex_proj") %>% 
+    select(Country, sex_proj, mean_ch_e0, sd_ch_e0) %>% 
+    mutate(text = glue::glue("{format(mean_ch_e0, digits=2)} ({format(sd_ch_e0, digits=2)})")) %>% 
+    select(Country, sex_proj, text) %>% 
+    spread(sex_proj, text) %>% 
+    set_names(c("Country", rep(c("2012", "2014", "2016", "2018"), 2)))
+
+table_wide
+
+
+wb <- openxlsx::createWorkbook()
+wb %>% addWorksheet(sheetName = "ons_proj_improvements_sd")
+wb %>% writeData(sheet = "ons_proj_improvements_sd", x = table_wide, startRow = 2)
+wb %>% mergeCells(sheet = "ons_proj_improvements_sd", rows = 1, cols = 2:5)
+wb %>% mergeCells(sheet = "ons_proj_improvements_sd", rows = 1, cols = 6:9)
+wb %>% writeData(sheet = "ons_proj_improvements_sd", x = make_fake_mtrx(c(" ",rep("Female", 4), rep("Male", 4))))
+wb %>% addStyle(sheet = "ons_proj_improvements_sd", rows = 1, cols = 1:9, 
+                style = createStyle(textDecoration = "bold", halign = "center")
+  )
+wb %>% addStyle(sheet = "ons_proj_improvements_sd", rows = 2, cols = 1:9, 
+                style = createStyle(border = "bottom")
+  )
+wb %>% setColWidths(sheet = "ons_proj_improvements_sd", cols = 1:9, widths = "auto"
+  )
+wb %>% addStyle(sheet = "ons_proj_improvements_sd", rows = 2:7, cols = 2, stack = TRUE,
+                style = createStyle(border = "left")
+  )
+
+
+
+saveWorkbook(wb, file = here("bayes_paper", "tables", "ons_proj_improvements_sd.xlsx"), overwrite = TRUE)
+
+
+
+```
+
 
 At this point let's compare the ONS projections against the historic values observed since 1990
 
