@@ -819,7 +819,7 @@ datablocks %>%
 
 ```
 
-* *Note*: For some reason this currentl doesn't run. I'm not sure of the reasons so this needs to be fixed at some point. 
+* *Note*: For some reason this currently doesn't run on my own computer, but does on the work version. (This is likely to be due to difference in package and R version. For now I can live with this.
 
 
 This shows that 1 breakpoint models can be identified for each population, but 2 and 3 breakpoint models only for some populations. For almost all populations, except Northern Ireland, the breakpoint is identified as around 2009 (so the change from 2009 to 2010)
@@ -1799,23 +1799,27 @@ bf_uk_nations <-
 
 bf_uk_nations
 
+bf_mutexc <- bf_uk_nations %>% 
+  filter(population %in% c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")) %>% 
+  mutate(population = factor(population, levels = c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")))
+
 ```
 
 
 ```{r, fig.width = 12, fig.height = 12}
-bf_uk_nations %>% 
+bf_mutexc %>% 
   mutate(perc = 100 * perc) %>% 
   mutate(
-    population = fct_relevel(population, c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland"))
+    population = fct_relevel(population, c("United Kingdom",  "England", "Scotland", "Wales", "Northern Ireland"))
   ) %>% 
   ggplot(aes(x = perc, y = bayes_factor, alpha = period)) +
   geom_line() + 
   geom_line(aes(x = perc, y = bayes_factor), size = 1.4, 
-              data = bf_uk_nations %>% 
+              data = bf_mutexc %>% 
                 filter(period == "2011-18") %>% 
                 mutate(perc = 100 * perc) %>%
                 mutate(
-    population = fct_relevel(population, c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland"))
+    population = fct_relevel(population, c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"))
   ) %>% 
                 mutate(is_pos = bayes_factor > 1),
               inherit.aes = FALSE
@@ -1827,10 +1831,10 @@ bf_uk_nations %>%
       x = perc, group = paste0(is_pos, period),
       fill = is_pos
     ), 
-              data = bf_uk_nations %>% 
+              data = bf_mutexc %>% 
                 mutate(perc = 100 * perc) %>%
                   mutate(
-              population = fct_relevel(population, c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland"))
+              population = fct_relevel(population, c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"))
             ) %>% 
                 mutate(is_pos = bayes_factor > 1),
               inherit.aes = FALSE, alpha = 0.2) + 
@@ -1902,6 +1906,57 @@ Some important points:
 * This approach means that the process of updating beliefs about the extent and evidence for a slowdown in life expectancy gains can be made formally rather than informally.
 * The Bayes Factor schedules can be recalculated whenever a new data release becomes available. This means that updated schedules can be produced within minutes of the release of official statistics. The commitment to do this each each new release, and to publish updated estimates of support for slowdown, should be made before such data are released. 
 * The tendency within UK populations has been for the rate of slowdown to be increasing over time, rather than to shift suddenly from one rate to another. If this continues then the proposed slowdown percentage that maximises the bayes factor will continue to shift further to the left with additional years' data, and could be maximised at a negative value (i.e. declining life expectancy rather than slowing improvement) if this tendency continues.
+
+## Table for main section 
+
+```{r}
+bf_table_part <- 
+  bf_mutexc %>% 
+    filter(population == "United Kingdom") %>% 
+    group_by(sex, after_end) %>% 
+    filter(bayes_factor == max(bayes_factor)) %>% 
+    ungroup() %>% 
+    select(-population) %>% 
+    mutate(perc = 100 * perc) %>% 
+    rename(year = after_end) %>% 
+    select(-period, -ll) %>% 
+    gather(-sex, -year, key = "key", value = "value") %>% 
+    unite(sex, key, col = "sex_key") %>% 
+    spread(sex_key, value) %>% 
+    select(year, female_mu, female_perc, female_bayes_factor, male_mu, male_perc, male_bayes_factor)
+
+bf_table_part
+
+ons_table_part <- 
+  ons_projections_tidied %>% 
+    filter(country == "UK") %>% 
+    mutate(sex = case_when(
+      sex == 'f' ~ "female",
+      sex == 'm' ~ "male",
+      TRUE       ~ NA_character_
+    )) %>% 
+    filter(age ==0) %>% 
+    filter(year >= proj_year) %>% 
+    select(-country, -age) %>% 
+    group_by(sex, proj_year) %>% 
+    arrange(year) %>% 
+    mutate(ch_e0 = ex - lag(ex)) %>% 
+    summarise(mean_ch_e0 = mean(ch_e0, na.rm = TRUE)) %>% 
+    rename(year = proj_year) %>% 
+    spread(sex, mean_ch_e0) %>% 
+    rename(female_ons_ch_e0 = female, male_ons_ch_e0 = male)
+
+ons_table_part
+
+bf_table_part %>% 
+  left_join(ons_table_part) %>% 
+  select(year = year, 
+         female_bf = female_mu, female_ons = female_ons_ch_e0,  female_bayes_factor,
+         male_bf = male_mu, male_ons = male_ons_ch_e0, male_bayes_factor
+  ) %>% 
+  set_names(nm = c("Projection Year", rep(c("Bayes Factor Estimate", "ONS Estimate", "Bayes Factor"), 2)))
+
+```
 
 
 Let's now compare the values that maximise the Bayes factor against the ONS population projections:
