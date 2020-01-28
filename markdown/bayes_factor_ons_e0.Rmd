@@ -819,7 +819,7 @@ datablocks %>%
 
 ```
 
-* *Note*: For some reason this currentl doesn't run. I'm not sure of the reasons so this needs to be fixed at some point. 
+* *Note*: For some reason this currently doesn't run on my own computer, but does on the work version. (This is likely to be due to difference in package and R version. For now I can live with this.
 
 
 This shows that 1 breakpoint models can be identified for each population, but 2 and 3 breakpoint models only for some populations. For almost all populations, except Northern Ireland, the breakpoint is identified as around 2009 (so the change from 2009 to 2010)
@@ -1746,7 +1746,7 @@ dta_e0 %>%
   mutate(ch_e0 = e0 - lag(e0)) %>% 
   ungroup() %>% 
   filter(!is.na(ch_e0)) %>%
-  filter(year < 2010) %>% 
+  filter(between(year, 1991, 2010)) %>% 
   select(-e0) %>% 
   group_by(population, sex) %>% 
   arrange(year) %>% 
@@ -1762,7 +1762,7 @@ dta_e0 %>%
   labs(
     x = "Mean annual change in life expectancy in weeks",
     y = "Standard deviation in annual change in life expectancy in weeks", 
-    title = "Mean and standard deviation of change in life expectancy\nfrom 1980 to 2010 by UK population",
+    title = "Mean and standard deviation of change in life expectancy\nfrom 1991 to 2010 by UK population",
     caption = "Source: ONS Single Year Lifetables"
   ) +
   
@@ -1799,23 +1799,27 @@ bf_uk_nations <-
 
 bf_uk_nations
 
+bf_mutexc <- bf_uk_nations %>% 
+  filter(population %in% c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")) %>% 
+  mutate(population = factor(population, levels = c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")))
+
 ```
 
 
 ```{r, fig.width = 12, fig.height = 12}
-bf_uk_nations %>% 
+bf_mutexc %>% 
   mutate(perc = 100 * perc) %>% 
   mutate(
-    population = fct_relevel(population, c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland"))
+    population = fct_relevel(population, c("United Kingdom",  "England", "Scotland", "Wales", "Northern Ireland"))
   ) %>% 
   ggplot(aes(x = perc, y = bayes_factor, alpha = period)) +
   geom_line() + 
   geom_line(aes(x = perc, y = bayes_factor), size = 1.4, 
-              data = bf_uk_nations %>% 
+              data = bf_mutexc %>% 
                 filter(period == "2011-18") %>% 
                 mutate(perc = 100 * perc) %>%
                 mutate(
-    population = fct_relevel(population, c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland"))
+    population = fct_relevel(population, c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"))
   ) %>% 
                 mutate(is_pos = bayes_factor > 1),
               inherit.aes = FALSE
@@ -1827,10 +1831,10 @@ bf_uk_nations %>%
       x = perc, group = paste0(is_pos, period),
       fill = is_pos
     ), 
-              data = bf_uk_nations %>% 
+              data = bf_mutexc %>% 
                 mutate(perc = 100 * perc) %>%
                   mutate(
-              population = fct_relevel(population, c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland"))
+              population = fct_relevel(population, c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"))
             ) %>% 
                 mutate(is_pos = bayes_factor > 1),
               inherit.aes = FALSE, alpha = 0.2) + 
@@ -1856,11 +1860,11 @@ For all populations except males in Northern Ireland, the addition of the 2018 s
 For each of these populations, what does the Bayes Factor maximise at? 
 
 ```{r, echo = TRUE}
-bf_uk_nations %>% 
+bf_mutexc %>% 
    filter(period == "2011-18") %>% 
    mutate(perc = 100 * perc) %>%
    mutate(
-    population = factor(population, levels = rev(c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland")))
+    population = factor(population, levels = c("United Kingdom",  "England", "Scotland", "Wales", "Northern Ireland"))
   ) %>% 
   group_by(sex, population) %>% 
   filter(bayes_factor == max(bayes_factor)) %>% 
@@ -1873,6 +1877,44 @@ bf_uk_nations %>%
     title = "Estimated percentage decline in life expectancy improvement rates over 2011-2018 compared with 1981-2010"
   ) +
   lims(x = c(0, 100))
+
+```
+
+```{r}
+table_wide <- 
+  bf_mutexc %>% 
+    group_by(population, sex, period) %>% 
+    filter(bayes_factor == max(bayes_factor)) %>% 
+    filter(period != "2011-11") %>% 
+    mutate(perc = 100 * (1 - perc)) %>% 
+    select(population, sex, period, perc, bayes_factor) %>% 
+    mutate(perc_bf = paste0(perc,"% (BF: ", formatC(round(bayes_factor, 5), format = 'f', digits = 5), ")")) %>% 
+    select(population, sex, period, perc_bf) %>% 
+    spread(period, perc_bf)
+
+
+wb <- openxlsx::createWorkbook()
+wb %>% addWorksheet(sheetName = "bf_nochange")
+wb %>% writeData(sheet = "bf_nochange", x = table_wide, startRow = 1)
+# wb %>% mergeCells(sheet = "ons_proj_improvements_sd", rows = 1, cols = 2:5)
+# wb %>% mergeCells(sheet = "ons_proj_improvements_sd", rows = 1, cols = 6:9)
+# wb %>% writeData(sheet = "ons_proj_improvements_sd", x = make_fake_mtrx(c(" ",rep("Female", 4), rep("Male", 4))))
+# wb %>% addStyle(sheet = "ons_proj_improvements_sd", rows = 1, cols = 1:9, 
+#                 style = createStyle(textDecoration = "bold", halign = "center")
+#   )
+# wb %>% addStyle(sheet = "ons_proj_improvements_sd", rows = 2, cols = 1:9, 
+#                 style = createStyle(border = "bottom")
+#   )
+# wb %>% setColWidths(sheet = "ons_proj_improvements_sd", cols = 1:9, widths = "auto"
+#   )
+# wb %>% addStyle(sheet = "ons_proj_improvements_sd", rows = 2:7, cols = 2, stack = TRUE,
+#                 style = createStyle(border = "left")
+#   )
+
+
+
+saveWorkbook(wb, file = here("bayes_paper", "tables", "bf_nochange.xlsx"), overwrite = TRUE)
+
 
 ```
 
@@ -1903,6 +1945,137 @@ Some important points:
 * The Bayes Factor schedules can be recalculated whenever a new data release becomes available. This means that updated schedules can be produced within minutes of the release of official statistics. The commitment to do this each each new release, and to publish updated estimates of support for slowdown, should be made before such data are released. 
 * The tendency within UK populations has been for the rate of slowdown to be increasing over time, rather than to shift suddenly from one rate to another. If this continues then the proposed slowdown percentage that maximises the bayes factor will continue to shift further to the left with additional years' data, and could be maximised at a negative value (i.e. declining life expectancy rather than slowing improvement) if this tendency continues.
 
+## Table for main section 
+
+```{r}
+bf_table_part <- 
+  bf_mutexc %>% 
+    group_by(population, sex, after_end) %>% 
+    filter(bayes_factor == max(bayes_factor)) %>% 
+    ungroup() %>% 
+    mutate(perc = 100 * perc) %>% 
+    rename(year = after_end) %>% 
+    select(-period, -ll) %>% 
+    gather(-population, -sex, -year, key = "key", value = "value") %>% 
+    unite(sex, key, col = "sex_key") %>% 
+    spread(sex_key, value) %>% 
+    select(population, year, female_mu, male_mu)
+
+bf_table_part
+
+ons_table_part <- 
+  ons_projections_tidied %>% 
+    mutate(sex = case_when(
+      sex == 'f' ~ "female",
+      sex == 'm' ~ "male",
+      TRUE       ~ NA_character_
+    )) %>% 
+    filter(age ==0) %>% 
+    filter(year >= proj_year) %>% 
+    select(-age) %>% 
+    group_by(country, sex, proj_year) %>% 
+    arrange(year) %>% 
+    mutate(ch_e0 = ex - lag(ex)) %>% 
+    summarise(mean_ch_e0 = mean(ch_e0, na.rm = TRUE)) %>% 
+    rename(year = proj_year) %>% 
+    spread(sex, mean_ch_e0) %>% 
+    rename(female_ons_ch_e0 = female, male_ons_ch_e0 = male)
+
+ons_table_part <- 
+  ons_table_part %>% 
+    ungroup() %>% 
+    mutate(country = ifelse(country == "UK", "United Kingdom", country)) %>% 
+    mutate(population = factor(country, 
+                               levels = c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"), 
+                               ordered = TRUE)
+    ) %>% 
+    select(population, year, female_ons_ch_e0, male_ons_ch_e0) %>%  
+    arrange(population, year)
+
+ons_table_part
+
+combined_table_wide <- 
+  bf_table_part %>% 
+    left_join(ons_table_part) %>% 
+    select(population, year = year, 
+           female_bf = female_mu, female_ons = female_ons_ch_e0,  
+           male_bf = male_mu, male_ons = male_ons_ch_e0
+    ) 
+
+combined_table_wide
+
+```
+
+
+Write to excel table 
+
+```{r}
+
+wb <- openxlsx::createWorkbook()
+wb %>% addWorksheet(sheetName = "bf_cf_ons")
+wb %>% writeData(sheet = "bf_cf_ons", x = combined_table_wide %>% set_names(nm = c("", "", "Bayes", "ONS", "Bayes", "ONS")), startRow = 2)
+wb %>% writeData(sheet = "bf_cf_ons", x = make_fake_mtrx(c("Population", "Year",rep("Female", 2), rep("Male", 2))))
+
+ wb %>% mergeCells(sheet = "bf_cf_ons", rows = 1, cols = 3:4)
+ wb %>% mergeCells(sheet = "bf_cf_ons", rows = 1, cols = 5:6)
+
+ wb %>% addStyle(sheet = "bf_cf_ons", rows = 1:2, cols = 1:6, gridExpand = TRUE, 
+                 style = createStyle(textDecoration = "bold", halign = "center")
+   )
+ wb %>% addStyle(sheet = "bf_cf_ons", rows = 2:42, cols = 3:6, gridExpand = TRUE, stack = TRUE,
+                 style = createStyle(numFmt = "0.000"))
+# wb %>% addStyle(sheet = "ons_proj_improvements_sd", rows = 2, cols = 1:9, 
+#                 style = createStyle(border = "bottom")
+#   )
+ wb %>% setColWidths(sheet = "bf_cf_ons", cols = 1:6, widths = "auto"
+   )
+# wb %>% addStyle(sheet = "ons_proj_improvements_sd", rows = 2:7, cols = 2, stack = TRUE,
+#                 style = createStyle(border = "left")
+#   )
+
+
+
+saveWorkbook(wb, file = here("bayes_paper", "tables", "bf_cf_ons_projections.xlsx"), overwrite = TRUE)
+
+
+
+```
+
+
+Now a figure just for UK as a whole 
+
+```{r}
+tmp <- 
+  combined_table_wide %>% 
+    filter(year >= 2012) %>% 
+    filter(population == "United Kingdom") %>% 
+    select(-population) %>% 
+    gather(-year, key = "sex_method", value = "gain") %>% 
+    separate(sex_method, into = c("sex", "method")) %>%
+    mutate(gain = 52.25 * gain) %>% 
+    mutate(method = case_when(
+      method == 'bf'   ~ "Bayes Factor",
+      method == "ons"  ~ "ONS projection",
+      TRUE             ~ NA_character_
+    )) 
+tmp %>% 
+  ggplot(aes(x = year, y = gain, group = method, colour = method, shape = method, linetype = method)) + 
+  geom_point() + 
+  geom_line(aes(x = year, y = gain, group = method, colour = method, shape = method),
+    inherit.aes = FALSE, 
+    data = tmp %>% filter(!is.na(gain))
+  ) + 
+  facet_wrap(~sex) + 
+  expand_limits(y = 0) + 
+  labs(
+    x = "Year", y = "Projected gain (weeks/year)",
+    title = "Comparison of projected gains implied by Bayes Factor and ONS projections",
+    subtitle = "UK as a whole"
+  )
+
+ggsave(here("bayes_paper","figures", "ons_cf_bayes.png"), height = 12, width = 20, units = "cm", dpi = 300)
+
+```
 
 Let's now compare the values that maximise the Bayes factor against the ONS population projections:
 
