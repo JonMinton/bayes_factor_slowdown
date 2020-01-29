@@ -236,6 +236,8 @@ mean_ch_e0_decade_hmd %>%
 
 ggsave(here("figures", "mean_ch_e0_decade.png"), height = 30, width = 30, units = "cm", dpi = 300)
 
+ggsave(here("bayes_paper", "figures", "A01_intl_mean_ch_e0_by_decade.png"), height = 30, width = 30, units = "cm", dpi = 300)
+
 ```
 
 ### 1.2.1.2 Table of HMD Average change in $e_0$ by decade
@@ -308,15 +310,9 @@ wb %>% addStyle(sheet = "hmd_countries_decade", rows = 2:39, cols = 2, stack = T
 
 
 
-saveWorkbook(wb, file = here("bayes_paper", "tables", "hmd_countries_decade.xlsx"), overwrite = TRUE)
+saveWorkbook(wb, file = here("bayes_paper", "tables", "M01_hmd_countries_decade.xlsx"), overwrite = TRUE)
 
 
-wide_table %>% 
-  kable() %>% 
-  kable_styling() %>% 
-  add_header_above(c(" ", "Female" = 4, "Male" = 4)) %>% 
-  footnote(general = "Average annual change in life expectancy by decade, sex, and country\n
-           NA: Not Available")
 
 ```
 
@@ -349,7 +345,7 @@ ch_e0_from1980_hmd %>%
 
 ggsave(here("figures", "hmd_slow_in_2010s_che0.png"), height = 15, width = 20, units = "cm", dpi = 300)
 
-
+ggsave(here("bayes_paper", "figures", "A02_selected_high_income.png"), height = 15, width = 20, units = "cm", dpi = 300)
 
 ```
 
@@ -491,6 +487,8 @@ dta_e0 %>%
 
 ggsave(here("figures", "annual_e0_ch_alluknations_ons.png"), height = 25, width = 25, units = "cm", dpi = 300)
 
+ggsave(here("bayes_paper", "figures", "A03_Annual_ch_uk_nations.png"), height = 25, width = 25, units = "cm", dpi = 300)
+
 ```
 
 From the above it seems most populations have seen a slowdown in improvement in recent years, and on average relatively stable improvements previously, with the exception of Northern Ireland, which saw a slowdown in improvement in the 1980s. The smaller populations tend to exhibit greater variability in annual rates of change than the larger populations. The extent of oscillation (negative autocorrelation from one year to the next) also appears greater in smaller populations. It is not immediately clear that the breakpoint for the slowdown is the same for all UK populations.  
@@ -568,7 +566,7 @@ wb %>% addStyle(sheet = "ons_countries_decade", rows = 2:7, cols = 2, stack = TR
 
 
 
-saveWorkbook(wb, file = here("bayes_paper", "tables", "ons_countries_decade.xlsx"), overwrite = TRUE)
+saveWorkbook(wb, file = here("bayes_paper", "tables", "M02_ons_countries_decade.xlsx"), overwrite = TRUE)
 
 
 
@@ -587,6 +585,79 @@ As expected, the ONS and HMD estimates of mean improvement per decade are closel
 | m   | 00s    | 0.319 | 0.313 |
 | m   | 10s    | 0.164 | 0.131 |
 
+Let's produce the above properly (rather than copying values) and save to an excel workbook
+
+
+```{r}
+
+ons_hmd_comparison_decade <- 
+  ons_ch_e0_decade %>% 
+    filter(population == "United Kingdom") %>%
+    select(-population) %>% 
+    rename(ons = mean_ch_e0) %>% 
+    left_join(
+        hmd_e0 %>% 
+          filter(country == "GBR_NP") %>% 
+          mutate(
+                decade = case_when(
+                  between(year, 1980, 1989)      ~ "1980s",
+                  between(year, 1990, 1999)      ~ "1990s",
+                  between(year, 2000, 2009)      ~ "2000s",
+                  between(year, 2010, 2020)      ~ "2010s",
+                  TRUE                           ~ NA_character_
+              )
+          ) %>% 
+          group_by(sex) %>% 
+          arrange(year) %>% 
+          mutate(ch_e0 = e0 - lag(e0)) %>% 
+          group_by(sex, decade) %>% 
+          summarise(mean_ch_e0 = mean(ch_e0)) %>% 
+          ungroup() %>% 
+          filter(!is.na(decade)) %>% 
+          filter(sex != "total") %>% 
+          rename(hmd = mean_ch_e0)
+    )
+
+ons_hmd_comparison_decade
+```
+
+```{r}
+
+wb <- openxlsx::createWorkbook()
+wb %>% addWorksheet(sheetName = "ons_hmd_comparison_decade")
+wb %>% writeData(sheet = "ons_hmd_comparison_decade", x = ons_hmd_comparison_decade %>% set_names(., nm = c(" ", " ", "HMD", "ONS")), startRow = 2)
+wb %>% mergeCells(sheet = "ons_hmd_comparison_decade", rows = 1, cols = 3:4)
+wb %>% writeData(sheet = "ons_hmd_comparison_decade", x = make_fake_mtrx(c("Sex", "Decade", rep("Average annual gain", 2))))
+wb %>% addStyle(sheet = "ons_hmd_comparison_decade", rows = 1:2, cols = 1:4, gridExpand = TRUE, stack = TRUE,
+                style = createStyle(textDecoration = "bold", halign = "center")
+  )
+wb %>% addStyle(sheet = "ons_hmd_comparison_decade", rows = 3:10, cols = 3:4, gridExpand = TRUE, stack = TRUE,
+                style = createStyle(numFmt = "0.000")
+  )
+wb %>% addStyle(sheet = "ons_hmd_comparison_decade", rows = 1:10, cols = 3, gridExpand = TRUE, stack = TRUE,
+                style = createStyle(border = "left")
+  )
+wb %>% addStyle(sheet = "ons_hmd_comparison_decade", rows = 2, cols = 1:4, gridExpand = TRUE, stack = TRUE,
+                style = createStyle(border = "bottom")
+  )
+
+
+# wb %>% addStyle(sheet = "ons_proj_improvements_sd", rows = 2, cols = 1:9, 
+#                 style = createStyle(border = "bottom")
+#   )
+# wb %>% setColWidths(sheet = "ons_proj_improvements_sd", cols = 1:9, widths = "auto"
+#   )
+# wb %>% addStyle(sheet = "ons_proj_improvements_sd", rows = 2:7, cols = 2, stack = TRUE,
+#                 style = createStyle(border = "left")
+#   )
+# 
+
+
+saveWorkbook(wb, file = here("bayes_paper", "tables", "A01_ons_hmd_decade.xlsx"), overwrite = TRUE)
+
+
+
+```
 
 Let's now present this as a barplot 
 
@@ -613,7 +684,7 @@ ons_ch_e0_decade %>%
   )
 
 ggsave(here("figures", "mean_ch_e0_decade_uknations.png"), height = 20, width = 30, units = "cm", dpi = 300)
-
+ggsave(here("bayes_paper", "figures", "M01_ch_e0_uk_nations_barchart.png"), height = 20, width = 30, units = "cm", dpi = 300)
 
 ```
 
@@ -705,11 +776,26 @@ corrs_trends <-
 corrs_trends
 
 corrs_trends %>% 
-  rplot() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  rplot(print_cor = TRUE) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(
+    title = "Correlation between trends in annual life expectancy changes",
+    subtitle = "1980 to 2018",
+    caption = "Source: ONS single year lifetables"
+  )
   
+ggsave(here("bayes_paper", "figures", "A04_corr_heatmap_uk.png"), width = 20, height = 20, units = "cm", dpi = 300)
+
 corrs_trends %>% 
-  network_plot()
+  network_plot() + 
+  labs(
+    title = "Network plot of correlation between trends in annual life expectancy changes",
+    subtitle = "1980 to 2018",
+    caption = "Source: ONS single year lifetables"
+  )
+
+ggsave(here("bayes_paper", "figures", "A05_corr_network_uk.png"), width = 20, height = 20, units = "cm", dpi = 300)
+
 
 ```
 
@@ -718,6 +804,43 @@ Trends in males and females in England are highly correlated (r = 0.89). The cor
 The network plot places series that are more correlated with each other closer together, and less correlated series further from each other. This confirms that males' and females' trends are closely correlated to each other in England and Wales, somewhat less so in Scotland, and least in Northern Ireland, where trends between sexes are less correlated with each other than are the correlations between countries elsewhere in the UK. 
 
 This suggests that any general trends which apply throughout the UK will apply less strongly in Northern Ireland than elsewhere. This should be considered when looking at the results in the next section, which aims to identify if and when there have been breakpoints in the trends in UK nations. 
+
+#### Correlation as table 
+
+```{r}
+wb <- createWorkbook()
+wb %>% addWorksheet(sheetName = "ons_trend_correlation")
+wb %>% writeData(sheet = "ons_trend_correlation", x = corrs_trends %>% rename(` ` = rowname), startRow = 1)
+# wb %>% mergeCells(sheet = "ons_hmd_comparison_decade", rows = 1, cols = 3:4)
+# wb %>% writeData(sheet = "ons_hmd_comparison_decade", x = make_fake_mtrx(c("Sex", "Decade", rep("Average annual gain", 2))))
+wb %>% addStyle(sheet = "ons_trend_correlation", rows = 1, cols = 1:9, gridExpand = TRUE, stack = TRUE,
+                 style = createStyle(textDecoration = "bold", halign = "center", textRotation = 70)
+   )
+wb %>% addStyle(sheet = "ons_trend_correlation", rows = 1:9, cols = 1, gridExpand = TRUE, stack = TRUE,
+                 style = createStyle(textDecoration = "bold", valign = "center")
+   )
+
+wb %>% addStyle(sheet = "ons_trend_correlation", rows = 2:9, cols = 2:9, gridExpand = TRUE, stack = TRUE,
+                style = createStyle(numFmt = "0.000")
+  )
+wb %>% setRowHeights(sheet = "ons_trend_correlation", rows = 2:9, heights = 20)
+wb %>% setColWidths(sheet = "ons_trend_correlation", cols = 2:9, widths = 5)
+wb %>% setColWidths(sheet = "ons_trend_correlation", cols = 1, widths = "auto")
+
+# wb %>% addStyle(sheet = "ons_hmd_comparison_decade", rows = 1:10, cols = 3, gridExpand = TRUE, stack = TRUE,
+#                 style = createStyle(border = "left")
+#   )
+# wb %>% addStyle(sheet = "ons_hmd_comparison_decade", rows = 2, cols = 1:4, gridExpand = TRUE, stack = TRUE,
+#                 style = createStyle(border = "bottom")
+#   )
+# 
+
+wb %>% saveWorkbook(file = here("bayes_paper", "tables", "A02_corrs_trends_uk.xlsx"), overwrite = TRUE)
+
+# corrs_trends
+
+
+```
 
 ### 2.2.4 Breakpoint analysis
 
@@ -864,6 +987,8 @@ datablocks %>%
   theme_light()
 
 ggsave(here("figures", "breakpoint_uk_allgroups.png"), height = 15, width = 25, units = "cm", dpi = 300)
+
+ggsave(here("bayes_paper", "figures", "A10_brk_uk_nations.png"), height = 15, width =25, units ="cm", dpi = 300)
 ```
 
 #### 2.2.4.2 Breakpoint table
@@ -960,7 +1085,7 @@ datablocks %>%
   labs(x = "Breakpoint estimate", y = "Population", 
        title = "Effect of random number seed on breakpoint estimate")
   
-ggsave(here("bayes_paper", "figures", "R3A01_Randomnumberseed.png"), height = 10, width = 15, units = "cm", dpi = 300)
+ggsave(here("bayes_paper", "figures", "A11_random_number_seed_breakpoint.png"), height = 10, width = 15, units = "cm", dpi = 300)
 ```
 Break point years, where they can be calculated, are largely identical. They confirm 2010 as a reasonable breakpoint year except for Northern Ireland. 
 
@@ -1422,7 +1547,7 @@ older_projns %>%
   geom_line(aes(x = year, y = e0), size = 1.2, inherit.aes = FALSE, data = older_projns %>% filter(projection == "Actual")) +
   labs(x = "Year", y = "Life expectancy at birth in years", title = "Life expectancy projections, 1971-2018")
 
-ggsave(here("bayes_paper", "figures", "R4_01_projections1971_2018.png"), height = 15, width = 20, units = "cm", dpi = 300)
+ggsave(here("bayes_paper", "figures", "M02_ons_lt_projns.png"), height = 20, width = 25, units = "cm", dpi = 300)
 ```
 
 
@@ -1455,10 +1580,12 @@ ons_projections_tidied %>%
   ) 
 
 ggsave(here("figures", "ons_life_expectancy_projections.png"), height = 25, width = 25, units = "cm", dpi = 300)
-ggsave(here("bayes_paper", "figures", "R4A01_ons_life_expectancy_projections.png"), height = 25, width = 25, units = "cm", dpi = 300)
+ggsave(here("bayes_paper", "figures", "A06_recentONSprojns_uknations.png"), height = 25, width = 25, units = "cm", dpi = 300)
   
 
 ```
+
+
 
 ### 3.2.2 Change in projections - annual increases 
 
@@ -1468,10 +1595,17 @@ For each of these projections, what's the implied expected improvement level?
 ons_projections_tidied %>% 
   filter(age == 0) %>% 
   filter(year >= 2019) %>% 
+  mutate(sex = case_when(
+    sex == 'm'   ~ 'male',
+    sex == 'f'   ~ 'female',
+    TRUE         ~ NA_character_
+  )) %>% 
   group_by(sex, country, proj_year) %>% 
   arrange(year) %>% 
   mutate(ch_e0 = ex - lag(ex)) %>% 
   filter(!is.na(ch_e0)) %>% 
+  ungroup() %>% 
+  mutate(country = factor(country, levels = c("UK", "England", "Scotland", "Wales", "Northern Ireland"))) %>% 
   ggplot(aes(x = year, y = ch_e0, group = factor(proj_year), colour = factor(proj_year), shape = factor(proj_year))) + 
   geom_point() + geom_line() +
   facet_grid(country ~ sex) +
@@ -1484,7 +1618,7 @@ ons_projections_tidied %>%
   ) 
 
 ggsave(here("figures", "ons_life_expectancy_projections_change.png"), height = 25, width = 25, units = "cm", dpi = 300)
-  
+ggsave(here("bayes_paper", "figures", "A07_recentch_e0_ONSprojns_uknations.png"), height = 25, width = 25, units = "cm", dpi = 300)
 
 ```
 
@@ -1493,41 +1627,54 @@ So, the projections involve adding varying numbers of increments of 0.1 life exp
 ### 3.2.3 Projections at all ages 
 
 ```{r}
-ons_projections_tidied %>%
-  filter(sex == "m") %>%
-  mutate(country = factor(country, levels = c("UK", "England", "Scotland","Wales", "Northern Ireland"))) %>% 
-  mutate(proj_year = factor(proj_year)) %>% 
-  ggplot(aes(x = year, y = age, fill = ex)) + 
-  geom_tile() + 
-  scale_fill_viridis_c() + 
-  coord_fixed() + 
-  facet_grid(country ~ proj_year) + 
-  labs(
-    x= "Year", y = "Age in years", 
-    title = "Projected life expectancy by ONS projection year and country, Males"
-  )
+ex_projns_male <- 
+  ons_projections_tidied %>%
+    filter(sex == "m") %>%
+    mutate(country = factor(country, levels = c("UK", "England", "Scotland","Wales", "Northern Ireland"))) %>% 
+    mutate(proj_year = factor(proj_year)) %>% 
+    ggplot(aes(x = year, y = age, fill = ex)) + 
+    geom_tile() + 
+    scale_fill_viridis_c() + 
+    coord_fixed() + 
+    facet_grid(country ~ proj_year) + 
+    labs(
+      x= "Year", y = "Age in years", 
+      title = "Males"
+    )
 
-ggsave(here("figures", "ons_projections_lexis_males.png"), height = 30, width = 25, units = "cm", dpi = 300)
+#ggsave(here("figures", "ons_projections_lexis_males.png"), height = 30, width = 25, units = "cm", dpi = 300)
 
 ```
 
 
 ```{r}
-ons_projections_tidied %>%
-  filter(sex == "f") %>%
-  mutate(country = factor(country, levels = c("UK", "England",  "Scotland", "Wales", "Northern Ireland"))) %>% 
-  mutate(proj_year = factor(proj_year)) %>% 
-  ggplot(aes(x = year, y = age, fill = ex)) + 
-  geom_tile() + 
-  scale_fill_viridis_c() + 
-  coord_fixed() + 
-  facet_grid(country ~ proj_year) + 
-  labs(
-    x= "Year", y = "Age in years", 
-    title = "Females, Projected life expectancy by ONS projection year and country"
-  )
 
-ggsave(here("figures", "ons_projections_lexis_females.png"), height = 30, width = 25, units = "cm", dpi = 300)
+ex_projns_female <- 
+  ons_projections_tidied %>%
+    filter(sex == "f") %>%
+    mutate(country = factor(country, levels = c("UK", "England",  "Scotland", "Wales", "Northern Ireland"))) %>% 
+    mutate(proj_year = factor(proj_year)) %>% 
+    ggplot(aes(x = year, y = age, fill = ex)) + 
+    geom_tile() + 
+    scale_fill_viridis_c() + 
+    coord_fixed() + 
+    facet_grid(country ~ proj_year) + 
+    labs(
+      x= "Year", y = "Age in years", 
+      title = "Females"
+    )
+
+#ggsave(here("figures", "ons_projections_lexis_females.png"), height = 30, width = 25, units = "cm", dpi = 300)
+
+```
+
+```{r}
+ggpubr::ggarrange(
+  ex_projns_male,
+  ex_projns_female
+)
+
+ggsave(here("bayes_paper", "figures", "A08_ons_ex_heatmap.png"), width = 35, height = 27, units = "cm", dpi = 300)
 
 ```
 
@@ -1535,52 +1682,68 @@ ggsave(here("figures", "ons_projections_lexis_females.png"), height = 30, width 
 
 
 ```{r}
-ons_projections_tidied %>% 
-  group_by(country, sex, age, year) %>% 
-  arrange(proj_year) %>% 
-  mutate(ch_ex_proj = ex - lag(ex)) %>% 
-  filter(!is.na(ch_ex_proj)) %>% 
-  ungroup() %>% 
-  mutate(country = factor(country, levels = c("UK", "England", "Scotland", "Wales","Northern Ireland"))) %>% 
-  filter(year >= 2020) %>% 
-  filter(sex == "m") %>% 
-  ggplot(aes(x = year, age, fill = ch_ex_proj)) + 
-  geom_tile() + 
-  coord_fixed() + 
-  facet_grid(country ~ proj_year) +
-  scale_fill_distiller(palette = "RdBu", limits = c(-1.5, 1.5)) + 
-  labs(
-    x = "Year", y = "Age in years", fill = "Change in ex",
-    title = "Males, change in conditional life expectancy projection"
-  ) +
-  theme(axis.text.x = element_text(angle = 90))
+ch_proj_male <- 
+  ons_projections_tidied %>% 
+    group_by(country, sex, age, year) %>% 
+    arrange(proj_year) %>% 
+    mutate(ch_ex_proj = ex - lag(ex)) %>% 
+    filter(!is.na(ch_ex_proj)) %>% 
+    ungroup() %>% 
+    mutate(country = factor(country, levels = c("UK", "England", "Scotland", "Wales","Northern Ireland"))) %>% 
+    filter(year >= 2020) %>% 
+    filter(sex == "m") %>% 
+    ggplot(aes(x = year, age, fill = ch_ex_proj)) + 
+    geom_tile() + 
+    coord_fixed() + 
+    facet_grid(country ~ proj_year) +
+    scale_fill_distiller(palette = "RdBu", limits = c(-1.5, 1.5)) + 
+    labs(
+      x = "Year", y = "Age in years", fill = "Change in ex",
+      title = "Males, change from last projection"
+    ) +
+    theme(axis.text.x = element_text(angle = 90))
 
-ggsave(here("figures", "change_ons_projections_males.png"), height = 40, width =20, units = "cm", dpi = 300)
+#ggsave(here("figures", "change_ons_projections_males.png"), height = 40, width =20, units = "cm", dpi = 300)
 
+ch_proj_female <- 
+  ons_projections_tidied %>% 
+    group_by(country, sex, age, year) %>% 
+    arrange(proj_year) %>% 
+    mutate(ch_ex_proj = ex - lag(ex)) %>% 
+    filter(!is.na(ch_ex_proj)) %>% 
+    ungroup() %>% 
+    mutate(country = factor(country, levels = c("UK", "England", "Scotland", "Wales", "Northern Ireland"))) %>% 
+    filter(year >= 2020) %>% 
+    filter(sex == "f") %>% 
+    ggplot(aes(x = year, age, fill = ch_ex_proj)) + 
+    geom_tile() + 
+    coord_fixed() + 
+    facet_grid(country ~ proj_year) +
+    scale_fill_distiller(palette = "RdBu", limits = c(-1.5, 1.5)) + 
+    labs(
+      x = "Year", y = "Age in years", fill = "Change in ex",
+      title = "Females, change from last projection"
+    ) +
+    theme(axis.text.x = element_text(angle = 90))
 
-ons_projections_tidied %>% 
-  group_by(country, sex, age, year) %>% 
-  arrange(proj_year) %>% 
-  mutate(ch_ex_proj = ex - lag(ex)) %>% 
-  filter(!is.na(ch_ex_proj)) %>% 
-  ungroup() %>% 
-  mutate(country = factor(country, levels = c("UK", "England", "Scotland", "Wales", "Northern Ireland"))) %>% 
-  filter(year >= 2020) %>% 
-  filter(sex == "f") %>% 
-  ggplot(aes(x = year, age, fill = ch_ex_proj)) + 
-  geom_tile() + 
-  coord_fixed() + 
-  facet_grid(country ~ proj_year) +
-  scale_fill_distiller(palette = "RdBu", limits = c(-1.5, 1.5)) + 
-  labs(
-    x = "Year", y = "Age in years", fill = "Change in ex",
-    title = "Females, change in conditional life expectancy projection"
-  ) +
-  theme(axis.text.x = element_text(angle = 90))
-
-ggsave(here("figures", "change_ons_projections_females.png"), height = 40, width =20, units = "cm", dpi = 300)
+#ggsave(here("figures", "change_ons_projections_females.png"), height = 40, width =20, units = "cm", dpi = 300)
 
 ```
+
+And as a 2x1 table
+
+```{r}
+ggpubr::ggarrange(
+  ch_proj_male,
+  ch_proj_female
+)
+
+ggsave(here("bayes_paper", "figures", "A09_ons_ch_ex_heatmap.png"), width = 25, height = 27, units = "cm", dpi = 300)
+
+```
+
+
+
 
 ## 3.3 Summaries
 
@@ -1646,7 +1809,7 @@ wb %>% addStyle(sheet = "ons_proj_improvements_sd", rows = 2:7, cols = 2, stack 
 
 
 
-saveWorkbook(wb, file = here("bayes_paper", "tables", "ons_proj_improvements_sd.xlsx"), overwrite = TRUE)
+saveWorkbook(wb, file = here("bayes_paper", "tables", "M03_ons_proj_improvements_sd.xlsx"), overwrite = TRUE)
 
 
 
@@ -1695,8 +1858,53 @@ dta_e0 %>%
 
 This checks out with what I've calculated before. (Phew!)
 
+As a table for Excel (sd instead of var)
+
+```{r}
+
+table_1991_2010_gains <- 
+  dta_e0 %>% 
+    filter(between(year, 1990, 2010)) %>% 
+    mutate(Country = factor(population, levels = c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"))) %>%
+    filter(!is.na(Country)) %>% 
+    rename(Sex = sex) %>% 
+    group_by(Country, Sex) %>% 
+    arrange(year) %>% 
+    mutate(ch_e0 = e0 - lag(e0)) %>% 
+    filter(!is.na(ch_e0)) %>% 
+    summarise(mean_ch_e0  = mean(ch_e0), sd_ch_e0 = sd(ch_e0)) %>% 
+    ungroup() 
+
+table_1991_2010_gains
+```
+
+```{r}
+wb <- createWorkbook()
+wb %>% addWorksheet(sheetName = "ons_avg_gain_1991_2010")
+
+wb %>% writeData(sheet = "ons_avg_gain_1991_2010", table_1991_2010_gains %>% set_names(., nm = c("Country", "Sex", "Mean gain", "SD")))
+
+wb %>% addStyle(sheet = "ons_avg_gain_1991_2010", rows = 1, cols = 1:4, stack = TRUE,
+                         style = createStyle(textDecoration = "bold", halign = "center")
+)
+wb %>% addStyle(sheet = "ons_avg_gain_1991_2010", rows = 2:11, cols = 3:4, stack = TRUE, gridExpand = TRUE,
+                         style = createStyle(numFmt = "0.000")
+)
+wb %>% addStyle(sheet = "ons_avg_gain_1991_2010", rows = 1, cols = 1:4, stack = TRUE, gridExpand = TRUE,
+                         style = createStyle(border = "bottom")
+)
+wb %>% addStyle(sheet = "ons_avg_gain_1991_2010", rows = 1:11, cols = 3, stack = TRUE, gridExpand = TRUE,
+                         style = createStyle(border = "left")
+)
+
+wb %>% setColWidths(sheet = "ons_avg_gain_1991_2010", cols = 1:4, widths = "auto") 
 
 
+saveWorkbook(wb, file = here("bayes_paper", "tables", "A04_avg_gain_uknations_1991_2010.xlsx"), overwrite = TRUE)
+
+
+
+```
 
 
 #### 3.3.1.1 Average projected improvement - visualised
@@ -1737,7 +1945,7 @@ ggsave(here("figures", "ons_proj_assumed_e0_gain.png"), height = 20, width = 30,
 
 
 
-Now, let's determine the average change (and SD) from 1980 to 2010
+Now, let's determine the average change (and SD) from 1991 to 2010
 
 ```{r}
 dta_e0 %>% 
@@ -1854,6 +2062,8 @@ bf_mutexc %>%
   scale_x_continuous(breaks = seq(0, 100, by = 10))
 
 ggsave(here("figures", "bayes_factor_various_proposed_slowdown_levels.png"), height = 12, width = 12, units = "in", dpi = 300)
+
+ggsave(here("bayes_paper", "figures", "A12_Bayes_Factor_Schedules.png"), height = 25, width = 30, units = "cm", dpi = 300)
 ```
 
 For all populations except males in Northern Ireland, the addition of the 2018 single year life expectancy data led to sizeable increases in the empirical support for the belief that there has been a slowdown in life expectancy after 2010; this is seen by noting how much higher the bold line, which incorporates the 2018 data, is than the fainter lines representing cumulative data based on shorter series of observations. For most of these populations, the peak of the bold line is to the left of peaks based on earlier series, meaning not only did the 2018 observations increase the strength of evidence supporting belief in a slowdown in life expectancy improvements, but also suggested more severe magnitudes of slowdown than the series excluding this most recent observation had indicated. For the UK as a whole, the addition of the life expectancy data for 2018 suggested an overall slowdown of around 60% was most likely, compared with a most likely magnitude of slowdown of around 50% based on data up to 2017. 
@@ -1871,12 +2081,18 @@ bf_mutexc %>%
   ungroup() %>% 
   ggplot(aes(y = population, x = 100 - perc, shape = sex, colour = sex)) + 
   geom_point() + 
+  geom_text(aes(label = 100 -perc), nudge_y = 0.2) + 
   labs(
-    x = "Percentage decline from 1980-2011 levels",
+    x = "Percentage decline from 1991-2010 levels",
     y = "Population", 
-    title = "Estimated percentage decline in life expectancy improvement rates over 2011-2018 compared with 1981-2010"
+    title = "Estimated percentage slowdown",
+    subtitle = "Decline over 2011-2018 compared with 1991-2010",
+    caption = "Source: ONS Single Year Lifetables"
   ) +
-  lims(x = c(0, 100))
+  lims(x = c(0, 100)) + 
+  geom_vline(xintercept = 0)
+  
+ggsave(here("bayes_paper", "figures", "A13_pct_decline_2011_18_cf_1991_2011.png"), height = 15, width = 25, units = "cm", dpi =300)
 
 ```
 
@@ -1887,9 +2103,9 @@ table_wide <-
     filter(bayes_factor == max(bayes_factor)) %>% 
     filter(period != "2011-11") %>% 
     mutate(perc = 100 * (1 - perc)) %>% 
-    select(population, sex, period, perc, bayes_factor) %>% 
+    select(Population = population, Sex = sex, period, perc, bayes_factor) %>% 
     mutate(perc_bf = paste0(perc,"% (BF: ", formatC(round(bayes_factor, 5), format = 'f', digits = 5), ")")) %>% 
-    select(population, sex, period, perc_bf) %>% 
+    select(Population, Sex, period, perc_bf) %>% 
     spread(period, perc_bf)
 
 
@@ -1899,43 +2115,25 @@ wb %>% writeData(sheet = "bf_nochange", x = table_wide, startRow = 1)
 # wb %>% mergeCells(sheet = "ons_proj_improvements_sd", rows = 1, cols = 2:5)
 # wb %>% mergeCells(sheet = "ons_proj_improvements_sd", rows = 1, cols = 6:9)
 # wb %>% writeData(sheet = "ons_proj_improvements_sd", x = make_fake_mtrx(c(" ",rep("Female", 4), rep("Male", 4))))
-# wb %>% addStyle(sheet = "ons_proj_improvements_sd", rows = 1, cols = 1:9, 
-#                 style = createStyle(textDecoration = "bold", halign = "center")
-#   )
-# wb %>% addStyle(sheet = "ons_proj_improvements_sd", rows = 2, cols = 1:9, 
-#                 style = createStyle(border = "bottom")
-#   )
-# wb %>% setColWidths(sheet = "ons_proj_improvements_sd", cols = 1:9, widths = "auto"
-#   )
+ wb %>% addStyle(sheet = "bf_nochange", rows = 1, cols = 1:9, 
+                 style = createStyle(textDecoration = "bold", halign = "center")
+   )
+wb %>% addStyle(sheet = "bf_nochange", rows = 1, cols = 1:9, stack = TRUE, 
+                style = createStyle(border = "bottom")
+  )
+ wb %>% setColWidths(sheet = "bf_nochange", cols = 1:9, widths = "auto"
+   )
 # wb %>% addStyle(sheet = "ons_proj_improvements_sd", rows = 2:7, cols = 2, stack = TRUE,
 #                 style = createStyle(border = "left")
 #   )
 
 
 
-saveWorkbook(wb, file = here("bayes_paper", "tables", "bf_nochange.xlsx"), overwrite = TRUE)
+saveWorkbook(wb, file = here("bayes_paper", "tables", "M04_bf_nochange.xlsx"), overwrite = TRUE)
 
 
 ```
 
-And as a table 
-
-
-```{r, echo = TRUE}
-bf_uk_nations %>% 
-   filter(period == "2011-18") %>% 
-   mutate(perc = 100 * perc) %>%
-   mutate(
-    population = factor(population, levels = rev(c("United Kingdom", "Great Britain", "England & Wales", "England", "Scotland", "Wales", "Northern Ireland")))
-  ) %>% 
-  group_by(sex, population) %>% 
-  filter(bayes_factor == max(bayes_factor)) %>% 
-  ungroup() %>% 
-  select(population, sex, perc, bayes_factor) %>% 
-  mutate(perc = 100 - perc)  
-  
-
-```
 
 In the UK as a whole, it is most likely that life expectancy improvement rates have slowed down by 62% for females, and 59% for males. This is made up of a 60% (females) and 59% (males) slowdown in England, a 72% (females) and 56% (males) slowdown in Scotland, a 59% (females) and 29% (males) slowdown in Northern Ireland, and an estimated 77% (females) and 83% (males) slowdown in Wales. With the exception of males in Northern Ireland, rates of slowdown are therefore similar across UK nations, and generally slightly more severe for females than males. 
 
@@ -2016,26 +2214,26 @@ wb %>% addWorksheet(sheetName = "bf_cf_ons")
 wb %>% writeData(sheet = "bf_cf_ons", x = combined_table_wide %>% set_names(nm = c("", "", "Bayes", "ONS", "Bayes", "ONS")), startRow = 2)
 wb %>% writeData(sheet = "bf_cf_ons", x = make_fake_mtrx(c("Population", "Year",rep("Female", 2), rep("Male", 2))))
 
- wb %>% mergeCells(sheet = "bf_cf_ons", rows = 1, cols = 3:4)
- wb %>% mergeCells(sheet = "bf_cf_ons", rows = 1, cols = 5:6)
+wb %>% mergeCells(sheet = "bf_cf_ons", rows = 1, cols = 3:4)
+wb %>% mergeCells(sheet = "bf_cf_ons", rows = 1, cols = 5:6)
 
- wb %>% addStyle(sheet = "bf_cf_ons", rows = 1:2, cols = 1:6, gridExpand = TRUE, 
+wb %>% addStyle(sheet = "bf_cf_ons", rows = 1:2, cols = 1:6, gridExpand = TRUE, 
                  style = createStyle(textDecoration = "bold", halign = "center")
    )
- wb %>% addStyle(sheet = "bf_cf_ons", rows = 2:42, cols = 3:6, gridExpand = TRUE, stack = TRUE,
+wb %>% addStyle(sheet = "bf_cf_ons", rows = 2:42, cols = 3:6, gridExpand = TRUE, stack = TRUE,
                  style = createStyle(numFmt = "0.000"))
-# wb %>% addStyle(sheet = "ons_proj_improvements_sd", rows = 2, cols = 1:9, 
-#                 style = createStyle(border = "bottom")
-#   )
+wb %>% addStyle(sheet = "bf_cf_ons", rows = 2, cols = 1:9, stack = TRUE,
+                style = createStyle(border = "bottom")
+  )
  wb %>% setColWidths(sheet = "bf_cf_ons", cols = 1:6, widths = "auto"
    )
-# wb %>% addStyle(sheet = "ons_proj_improvements_sd", rows = 2:7, cols = 2, stack = TRUE,
-#                 style = createStyle(border = "left")
-#   )
+wb %>% addStyle(sheet = "ons_proj_improvements_sd", rows = 1:42, cols = 3, stack = TRUE,
+                style = createStyle(border = "left")
+  )
 
 
 
-saveWorkbook(wb, file = here("bayes_paper", "tables", "bf_cf_ons_projections.xlsx"), overwrite = TRUE)
+saveWorkbook(wb, file = here("bayes_paper", "tables", "M05_bf_cf_ons_projections.xlsx"), overwrite = TRUE)
 
 
 
@@ -2073,7 +2271,7 @@ tmp %>%
     subtitle = "UK as a whole"
   )
 
-ggsave(here("bayes_paper","figures", "ons_cf_bayes.png"), height = 12, width = 20, units = "cm", dpi = 300)
+ggsave(here("bayes_paper","figures", "M03_ons_cf_bayes.png"), height = 12, width = 20, units = "cm", dpi = 300)
 
 ```
 
