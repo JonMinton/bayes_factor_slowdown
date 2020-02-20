@@ -433,6 +433,16 @@ ons_lifetables
 
 ```
 
+Let's save the full lifeables (as they're useful for another project!) 
+
+```{r}
+ons_lifetables %>% 
+  write_rds(here("data", "all_ons_lifetables_tidied.rds"))
+
+
+```
+
+
 From this it's very easy to extract $e_0$ alone.
 
 
