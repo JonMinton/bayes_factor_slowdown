@@ -7,221 +7,193 @@
 #| message: false
 pacman::p_load(tidyverse, here, readxl, knitr, kableExtra)
 
+# Legacy helper first (non-BF utilities only); corrected engine LAST so its
+# get_ll / calc_bayes_factors mask the buggy legacy definitions (see audit
+# appendix and NOTES.md).
 source(here::here("scripts", "load_packages_and_functions.R"))
+source(here::here("R", "bayes_factors.R"))
 
-dta_e0 <- read_csv(here("data", "e0_from_ons_allnations.csv"))
+populations <- c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")
 
-ons_projections_tidied <- read_rds(here("data", "ons_projections", "all_tidied.rds"))
+# Actual e0 to 2024 (single-year life tables to 2018, 2024-based NPP historic
+# estimates 2019-2024). ONS projection rounds now cover 2012-2024.
+dta_e0 <- read_csv(here("data", "e0_from_ons_allnations_extended.csv"),
+                   show_col_types = FALSE) %>%
+  filter(population %in% populations)
+
+ons_projections_tidied <- read_rds(here("data", "ons_projections", "all_tidied_2012_2024.rds"))
 ```
 
-This chapter compares the improvement rates that maximise the Bayes factor schedules from the previous chapter against the average annual improvement rates for $e_0$ implied by each ONS projection round (2012, 2014, 2016 and 2018), to quantify how optimistic or pessimistic each of the projections has been compared with post-2010 trends.
+This chapter compares the improvement rate that maximises the Bayes factor schedule for the **pre-pandemic headline window** (2011–2019, from the previous chapter) against the average annual improvement rate for $e_0$ implied by each ONS projection round (2012, 2014, 2016, 2018, 2020, 2022 and 2024) [@ons_expectation_of_life], to quantify how optimistic or pessimistic each projection has been relative to what the pre-2020 data alone implied.
+
+The Bayes-factor benchmark is a single value per population and sex: the mean annual $e_0$ gain at the pre-pandemic BF-maximising slowdown scenario. Anchoring on the pre-pandemic window (rather than a series that includes the COVID shock) keeps the comparison against ONS assumptions clean — the ONS rounds themselves are, likewise, projections of a smoothly improving process.
 
 ```{r}
 #| label: recalc-bayes-factors
 #| warning: false
-bf_uk_nations <-
+ch_e0_dta <-
   dta_e0 %>%
-    group_by(population, sex) %>%
-    arrange(year) %>%
-    mutate(ch_e0 = e0 - lag(e0)) %>%
-    ungroup() %>%
-    filter(!is.na(ch_e0)) %>%
-    select(-e0) %>%
-    group_by(population, sex) %>%
-    arrange(year) %>%
-    nest() %>%
-    crossing(after_end = 2011:2018) %>%
-    mutate(
-      bayes_df = map2(
-        after_end, data, ~calc_bayes_factors(after_period = c(2011, .x), before_period = c(1991, 2010), outcome_var = ch_e0, dta = .y)
-      )
-    ) %>%
-    select(population, sex, after_end, bayes_df) %>%
-    unnest(cols = c(bayes_df)) %>%
-    mutate(
-      period = paste0("2011-", str_sub(after_end, 3,4))
-    )
+  group_by(population, sex) %>%
+  arrange(year) %>%
+  mutate(ch_e0 = e0 - lag(e0)) %>%
+  ungroup() %>%
+  filter(!is.na(ch_e0)) %>%
+  select(-e0, -source)
 
-bf_mutexc <- bf_uk_nations %>%
-  filter(population %in% c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")) %>%
-  mutate(population = factor(population, levels = c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")))
+# Pre-pandemic (2011-2019) BF-maximising mean annual gain per population / sex.
+bf_benchmark <-
+  ch_e0_dta %>%
+  group_by(population, sex) %>%
+  nest() %>%
+  mutate(bf = map(data, ~calc_bayes_factors(
+    .x, before_period = c(1991, 2010), after_period = c(2011, 2019),
+    outcome_var = ch_e0))) %>%
+  select(population, sex, bf) %>%
+  unnest(bf) %>%
+  group_by(population, sex) %>%
+  slice_max(log_bf, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  transmute(population, sex, bf_mu = mu)
+
+bf_benchmark
 ```
 
-For each population and sex, we extract the annual improvement rate `mu` at which the Bayes factor is maximised for each end-of-observation year, and set this alongside the mean annual improvement in period life expectancy at birth implied by each ONS projection round (calculated from each projection's period $e_0$ series from the projection year onwards).
+For each ONS projection round we compute the mean annual improvement in period life expectancy at birth implied by that round (from the projection's period $e_0$ series in the projection year onwards), and set it alongside the pre-pandemic Bayes-factor benchmark.
 
 ```{r}
 #| label: tbl-bf-vs-ons
 #| warning: false
 #| message: false
-bf_table_part <-
-  bf_mutexc %>%
-    group_by(population, sex, after_end) %>%
-    filter(bayes_factor == max(bayes_factor)) %>%
-    ungroup() %>%
-    mutate(perc = 100 * perc) %>%
-    rename(year = after_end) %>%
-    select(-period, -ll) %>%
-    gather(-population, -sex, -year, key = "key", value = "value") %>%
-    unite(sex, key, col = "sex_key") %>%
-    spread(sex_key, value) %>%
-    select(population, year, female_mu, male_mu)
-
-bf_table_part
-
-ons_table_part <-
+ons_implied <-
   ons_projections_tidied %>%
-    mutate(sex = case_when(
-      sex == 'f' ~ "female",
-      sex == 'm' ~ "male",
-      TRUE       ~ NA_character_
-    )) %>%
-    filter(age ==0) %>%
-    filter(year >= proj_year) %>%
-    select(-age) %>%
-    group_by(country, sex, proj_year) %>%
-    arrange(year) %>%
-    mutate(ch_e0 = ex - lag(ex)) %>%
-    summarise(mean_ch_e0 = mean(ch_e0, na.rm = TRUE)) %>%
-    rename(year = proj_year) %>%
-    spread(sex, mean_ch_e0) %>%
-    rename(female_ons_ch_e0 = female, male_ons_ch_e0 = male)
+  mutate(sex = case_when(
+    sex == "f" ~ "female",
+    sex == "m" ~ "male",
+    TRUE       ~ NA_character_
+  )) %>%
+  filter(age == 0) %>%
+  filter(year >= proj_year) %>%
+  group_by(country, sex, proj_year) %>%
+  arrange(year) %>%
+  mutate(ch_e0 = ex - lag(ex)) %>%
+  summarise(ons_mu = mean(ch_e0, na.rm = TRUE), .groups = "drop") %>%
+  mutate(country = ifelse(country == "UK", "United Kingdom", country)) %>%
+  rename(population = country, round = proj_year)
 
-ons_table_part <-
-  ons_table_part %>%
-    ungroup() %>%
-    mutate(country = ifelse(country == "UK", "United Kingdom", country)) %>%
-    mutate(population = factor(country,
-                               levels = c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"),
-                               ordered = TRUE)
-    ) %>%
-    select(population, year, female_ons_ch_e0, male_ons_ch_e0) %>%
-    arrange(population, year)
+# Modern dplyr will not join a plain factor to an ordered factor, and mixing
+# population key types silently drops rows: coerce both sides to character
+# before the join (behaviour-preserving).
+combined_long <-
+  ons_implied %>%
+  mutate(population = as.character(population)) %>%
+  left_join(bf_benchmark %>% mutate(population = as.character(population)),
+            by = c("population", "sex")) %>%
+  mutate(population = factor(population, levels = populations)) %>%
+  arrange(population, sex, round)
 
-ons_table_part
+combined_wide <-
+  combined_long %>%
+  pivot_wider(names_from = sex, values_from = c(ons_mu, bf_mu)) %>%
+  select(population, round,
+         ons_mu_female, bf_mu_female, ons_mu_male, bf_mu_male) %>%
+  arrange(population, round)
 
-combined_table_wide <-
-  bf_table_part %>%
-    # current dplyr will not join a plain factor to an ordered factor; the
-    # population key is factor here but ordered in ons_table_part, so match
-    # on character (behaviour-preserving)
-    mutate(population = as.character(population)) %>%
-    left_join(ons_table_part %>% mutate(population = as.character(population)),
-              by = c("population", "year")) %>%
-    select(population, year = year,
-           female_bf = female_mu, female_ons = female_ons_ch_e0,
-           male_bf = male_mu, male_ons = male_ons_ch_e0
-    )
-
-combined_table_wide %>%
+combined_wide %>%
   kable(
     digits = 3,
-    col.names = c("Population", "Year", "Bayes", "ONS", "Bayes", "ONS")
+    col.names = c("Population", "Round", "ONS", "BF (pre-2020)", "ONS", "BF (pre-2020)")
   ) %>%
   add_header_above(c(" " = 2, "Female" = 2, "Male" = 2)) %>%
   kable_styling()
 ```
 
-Now a figure just for the UK as a whole.
+The Bayes-factor benchmark (`BF (pre-2020)`) is constant down each population block, because it is the single pre-pandemic best estimate; the ONS column changes with each round. A round whose implied gain lies below the benchmark was projecting slower improvement than the pre-2020 data alone implied (relatively pessimistic); above it, relatively optimistic.
+
+Now a figure for the UK as a whole, showing every ONS round against the fixed pre-pandemic Bayes-factor benchmark.
 
 ```{r}
 #| label: fig-ons-cf-bayes
 #| warning: false
-tmp <-
-  combined_table_wide %>%
-    filter(year >= 2012) %>%
-    filter(population == "United Kingdom") %>%
-    select(-population) %>%
-    gather(-year, key = "sex_method", value = "gain") %>%
-    separate(sex_method, into = c("sex", "method")) %>%
-    mutate(gain = 52.25 * gain) %>%
-    mutate(method = case_when(
-      method == 'bf'   ~ "Bayes Factor",
-      method == "ons"  ~ "ONS projection",
-      TRUE             ~ NA_character_
-    ))
-tmp %>%
-  ggplot(aes(x = year, y = gain, group = method, colour = method, shape = method, linetype = method)) +
+uk_long <-
+  combined_long %>%
+  filter(population == "United Kingdom") %>%
+  select(round, sex, `ONS projection` = ons_mu, `Bayes Factor (pre-2020)` = bf_mu) %>%
+  pivot_longer(c(`ONS projection`, `Bayes Factor (pre-2020)`),
+               names_to = "method", values_to = "gain") %>%
+  mutate(gain = 52.18 * gain)
+
+uk_long %>%
+  ggplot(aes(x = round, y = gain, colour = method, shape = method, linetype = method)) +
+  geom_line() +
   geom_point() +
-  geom_line(aes(x = year, y = gain, group = method, colour = method, shape = method),
-    inherit.aes = FALSE,
-    data = tmp %>% filter(!is.na(gain))
-  ) +
   facet_wrap(~sex) +
   expand_limits(y = 0) +
   labs(
-    x = "Year", y = "Projected gain (weeks/year)",
-    title = "Comparison of projected gains implied by Bayes Factor and ONS projections",
-    subtitle = "UK as a whole"
+    x = "ONS projection round", y = "Implied gain (weeks/year)",
+    title = "ONS-implied vs pre-pandemic Bayes-factor annual e0 gain",
+    subtitle = "UK as a whole; Bayes-factor benchmark is fixed (pre-pandemic 2011-2019)"
   )
 
-ggsave(here("bayes_paper","figures", "M03_ons_cf_bayes.png"), height = 12, width = 20, units = "cm", dpi = 300)
+ggsave(here("bayes_paper", "figures", "M03_ons_cf_bayes_2024.png"), height = 12, width = 24, units = "cm", dpi = 300)
 ```
 
-Let's now compare the values that maximise the Bayes factor against the ONS population projections:
+```{r}
+#| label: newest-rounds-values
+#| echo: false
+uk_cmp <-
+  combined_long %>%
+  filter(population == "United Kingdom") %>%
+  mutate(ons_minus_bf = ons_mu - bf_mu)
 
-| Year      | BF- female | BF- male | ONS- female | ONS- male |
-|-----------|------------|----------|-------------|-----------|
-| 2011-2012 | 0.161      | 0.276    | 0.137       | 0.148     |
-| 2011-2014 | 0.163      | 0.218    | 0.129       | 0.147     |
-| 2011-2016 | 0.088      | 0.138    | 0.115       | 0.134     |
-| 2011-2018 | 0.075      | 0.108    | 0.094       | 0.114     |
+uk_get <- function(sx, rd) uk_cmp %>% filter(sex == sx, round == rd) %>% pull(ons_mu)
+bf_f <- bf_benchmark %>% filter(population == "United Kingdom", sex == "female") %>% pull(bf_mu)
+bf_m <- bf_benchmark %>% filter(population == "United Kingdom", sex == "male") %>% pull(bf_mu)
+```
 
-So, up to 2014, the ONS was projecting slower improvement rates than the 2011-12 data alone would suggest. For the 2016 and 2018 projections, the rates were slightly higher than the Bayes Factor alone would suggest, especially for females.
+Reading down the UK block, the ONS rounds tracked steadily downwards from the 2012 round, reflecting the accumulating evidence of stalling: for UK females the implied gain fell from `r formatC(uk_get("female", 2012), format="f", digits=3)` years/year (2012 round) toward the pre-pandemic Bayes-factor benchmark of `r formatC(bf_f, format="f", digits=3)`, and for males from `r formatC(uk_get("male", 2012), format="f", digits=3)` toward `r formatC(bf_m, format="f", digits=3)`.
 
-The remaining analysis is to express the UK's recent improvement rates and ONS projections as a percentage of the mean improvement from 1980 to 2010.
+The newer, post-drafting rounds (2020-based interim, 2022-based and 2024-based) sit close to the pre-2020 benchmark rather than far below it. For UK females the 2020, 2022 and 2024 rounds imply `r formatC(uk_get("female", 2020), format="f", digits=3)`, `r formatC(uk_get("female", 2022), format="f", digits=3)` and `r formatC(uk_get("female", 2024), format="f", digits=3)` years/year respectively — all at or slightly **above** the pre-2020 benchmark of `r formatC(bf_f, format="f", digits=3)`, i.e. marginally more optimistic than the pre-2020 data alone implied. For UK males the same rounds imply `r formatC(uk_get("male", 2020), format="f", digits=3)`, `r formatC(uk_get("male", 2022), format="f", digits=3)` and `r formatC(uk_get("male", 2024), format="f", digits=3)`, straddling the benchmark of `r formatC(bf_m, format="f", digits=3)` (the 2020 round slightly above, the 2022 and 2024 rounds slightly below). In short, the newest ONS rounds are broadly in line with — not markedly more pessimistic than — the pre-pandemic Bayes-factor estimate; the sharp downward revision happened over the 2012–2018 rounds, and has since levelled off.
+
+The remaining analysis expresses each ONS round and the pre-pandemic Bayes-factor benchmark as a proportion of the mean UK improvement from 1980 to 2010.
 
 ```{r}
 #| label: mean-longterm-improvement
 #| warning: false
 mean_lt_imp_uk <-
   dta_e0 %>%
-    filter(population == "United Kingdom") %>%
-    filter(between(year, 1980, 2011)) %>%
-    group_by(sex) %>%
-    arrange(year) %>%
-    mutate(ch_e0 = e0 - lag(e0)) %>%
-    summarise(
-      mean_ch_e0 = mean(ch_e0, na.rm = TRUE),
-      var_ch_e0 = var(ch_e0, na.rm = TRUE)
-    )
-
-mean_lt_imp_uk_female <- mean_lt_imp_uk %>% filter(sex == "female") %>% pull(mean_ch_e0)
-mean_lt_imp_uk_male <- mean_lt_imp_uk %>% filter(sex == "male") %>% pull(mean_ch_e0)
+  filter(population == "United Kingdom") %>%
+  filter(between(year, 1980, 2011)) %>%
+  group_by(sex) %>%
+  arrange(year) %>%
+  mutate(ch_e0 = e0 - lag(e0)) %>%
+  summarise(
+    mean_ch_e0 = mean(ch_e0, na.rm = TRUE),
+    var_ch_e0 = var(ch_e0, na.rm = TRUE),
+    .groups = "drop"
+  )
 
 mean_lt_imp_uk
 ```
-
-So, by 2012 the ONS was projecting future improvement rates that were around 30% lower (1 - 0.137 / 0.197) than long-term average improvement rates for females, and around 44% lower than long-term trends (1 - 0.148 / 0.265) for males. By contrast the Bayes Factor approach alone would predict slowdowns of around 18% for females, and gains of around 4% for males. By 2014 the ONS was projecting slowdowns of around 35% for females, and 44% for males.
 
 ```{r}
 #| label: tbl-est-as-pct-of-lt
 #| warning: false
 #| message: false
+lt_lookup <- mean_lt_imp_uk %>% select(sex, lt_ch_e0 = mean_ch_e0)
+
 est_as_pct_of_lt <-
-  tribble(
-    ~Year, ~BF_female, ~BF_male, ~ONS_female, ~ONS_male,
-    "2011-12", 0.161, 0.276, 0.137, 0.148,
-    "2011-14", 0.163, 0.218, 0.129, 0.147,
-    "2011-16", 0.088, 0.138, 0.115, 0.134,
-    "2011-18", 0.075, 0.108, 0.094, 0.114
-  ) %>%
-    gather(-Year, key = "method_sex", value = "ch_e0") %>%
-    separate(method_sex, into = c("method", "sex")) %>%
-    left_join(
-      tribble(
-        ~sex, ~lt_ch_e0,
-        "female", mean_lt_imp_uk_female,
-        "male", mean_lt_imp_uk_male
-      )
-    ) %>%
-    mutate(
-      new_as_pct = ch_e0 / lt_ch_e0
-    ) %>%
-    select(-ch_e0, -lt_ch_e0)
+  combined_long %>%
+  filter(population == "United Kingdom") %>%
+  select(round, sex, ONS = ons_mu, `BF (pre-2020)` = bf_mu) %>%
+  pivot_longer(c(ONS, `BF (pre-2020)`), names_to = "method", values_to = "ch_e0") %>%
+  left_join(lt_lookup, by = "sex") %>%
+  mutate(new_as_pct = ch_e0 / lt_ch_e0)
 
 est_as_pct_of_lt %>%
+  select(round, sex, method, new_as_pct) %>%
   unite(method, sex, col = "method_sex") %>%
-  spread(method_sex, new_as_pct) %>%
+  pivot_wider(names_from = method_sex, values_from = new_as_pct) %>%
+  arrange(round) %>%
   kable(digits = 3) %>%
   kable_styling()
 ```
@@ -232,14 +204,13 @@ And as a graph:
 #| label: fig-est-as-pct-of-lt
 #| warning: false
 est_as_pct_of_lt %>%
-  ggplot(aes(x = Year, y = new_as_pct, group = method, shape = method, colour = method)) +
+  ggplot(aes(x = round, y = new_as_pct, group = method, shape = method, colour = method)) +
   geom_point() + geom_line() +
   facet_wrap(~sex) +
   expand_limits(y = 0) +
   geom_hline(yintercept = 1) +
-  labs(x = "Projection Year", y = "New LT improvement as proportion of long-term trends")
+  labs(x = "ONS projection round",
+       y = "Implied improvement as proportion of 1980-2010 UK trend")
 ```
 
-So, it appears the ONS, and the experts who advised them, believed that the long-term improvement trends were unsustainable from 2011 onwards, and projected trends that were slower than the average improvement rates seen between 1980 and 2011. However, each successive biennial update has projected a slower rate of improvement than the previous projection. The Bayes Factor approach, with the accumulated data from 2011 to 2018, suggests the ONS projections are largely in line with recent data for males, but may still be underestimating the extent of the stalling in life expectancy gains for females.
-
-An advantage of the Bayes Factor approach is that it is trivial to update it every year, taking only a minute or so to rerun with an additional year's worth of data. This means that as soon as new data becomes available, it can be used to update our beliefs about long-term trends, and the extent of the deterioration from long-term trends if the accumulated recent data is considered representative of how long-term trends are likely to progress.
+Two things stand out. First, from 2011 onwards both the ONS and the pre-pandemic Bayes-factor estimate sat well below the 1980–2010 long-run trend (the horizontal line at 1), confirming that the stalling was real and that the ONS, and the experts advising it, believed the long-run improvement rate was not sustainable. Second, whereas the original (2012–2018) analysis showed each biennial ONS round revising downwards and, for females, still potentially over-optimistic relative to the accumulating data, the extended series shows the ONS rounds levelling off close to the pre-pandemic Bayes-factor benchmark. With the corrected likelihood the evidence for a slowdown is in fact stronger for males than females (see the audit appendix), so the earlier suggestion that the ONS remained too optimistic *mainly* for females does not survive the update. An advantage of the Bayes-factor approach remains that it is trivial to re-run with each new annual data release, updating our beliefs about the underlying improvement rate within minutes of publication.

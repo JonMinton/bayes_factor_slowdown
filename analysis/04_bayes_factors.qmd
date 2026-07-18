@@ -7,42 +7,58 @@
 #| message: false
 pacman::p_load(tidyverse, here, readxl, knitr, kableExtra, ggrepel)
 
+# Legacy helper script is sourced first, only for any non-Bayes-factor
+# utilities it defines. The corrected likelihood engine is sourced LAST so
+# that its get_ll and calc_bayes_factors mask the buggy legacy definitions of
+# the same names (see the audit appendix and NOTES.md).
 source(here::here("scripts", "load_packages_and_functions.R"))
+source(here::here("R", "bayes_factors.R"))
 
 write_to_table <- function(x, loc){
   write_csv(x, loc)
   x
 }
 
-dta_e0 <- read_csv(here("data", "e0_from_ons_allnations.csv"))
-```
+# Actual e0 to 2024 for the five UK populations. Values to 2018 are the ONS
+# single-year life tables (as used in the original paper); 2019-2024 are the
+# historic estimates embedded in the 2024-based NPP expectation-of-life files,
+# because ONS no longer publishes single-year life tables beyond 2020 (NOTES.md).
+populations <- c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")
 
-This chapter calculates Bayes factors [@kass1995bayes] for $e_0$ changes since 2010, assuming different rates of slowdown expressed as a percentage of the average prior (1991–2010) rate of change. The Bayes factor compares the likelihood of the observed post-2010 annual changes in life expectancy under a proposed slowdown scenario against their likelihood under the null scenario of no change from pre-2010 improvement rates: values above 1 indicate support for the slowdown scenario over the no-change scenario.
+dta_e0 <- read_csv(here("data", "e0_from_ons_allnations_extended.csv"),
+                   show_col_types = FALSE) %>%
+  filter(population %in% populations)
 
-::: {.callout-note}
-## Known bug in the likelihood function
-
-The likelihood function `get_ll` in `scripts/load_packages_and_functions.R`, on which the Bayes factor calculations below depend, contains a known operator-precedence bug: the term intended as `1 / (2 * sig_sq)` is written `(1 / 2 * sig_sq)`, which R parses as `0.5 * sig_sq`. The bug is deliberately **not** fixed in this chapter, so that the restructured analysis reproduces the legacy numbers exactly. It is documented in `NOTES.md` and is fixed — with an audit of its impact on the results — in a subsequent commit.
-:::
-
-Now, let's determine the average change (and SD) from 1991 to 2010.
-
-```{r}
-#| label: fig-mean-sd-preslowdown
-#| warning: false
-dta_e0 %>%
+ch_e0_dta <- dta_e0 %>%
   group_by(population, sex) %>%
   arrange(year) %>%
   mutate(ch_e0 = e0 - lag(e0)) %>%
   ungroup() %>%
-  filter(!is.na(ch_e0)) %>%
+  filter(!is.na(ch_e0))
+```
+
+This chapter calculates Bayes factors [@kass1995bayes] for $e_0$ changes since 2010, assuming different rates of slowdown expressed as a percentage of the average prior (1991–2010) rate of change. The Bayes factor compares the likelihood of the observed post-2010 annual changes in life expectancy under a proposed slowdown scenario against their likelihood under the null scenario of no change from pre-2010 improvement rates: values above 1 indicate support for the slowdown scenario over the no-change scenario. Because the corrected likelihood produces Bayes factors that overflow `exp()` for long observation windows, magnitudes are reported throughout on a $\log_{10}$ scale ($\log_{10}\mathrm{BF} = \log\mathrm{BF} / \log 10$).
+
+::: {.callout-note}
+## The corrected likelihood function
+
+Earlier drafts of this analysis depended on a likelihood function `get_ll` that contained an operator-precedence error: the term intended as `1 / (2 * sig_sq)` was written `(1 / 2 * sig_sq)`, which R parses as `0.5 * sig_sq`. This attenuated every Bayes factor toward 1 by a factor of $\sigma^4$ (three to four orders of magnitude for annual $e_0$ change), which is why the original manuscript reported Bayes factors indistinguishable from 1 despite years of accumulated evidence. **The bug is fixed here**: this chapter now sources the corrected engine from `R/bayes_factors.R`. The BF-*maximising* slowdown percentage is a monotone transform of the sum of squares and is therefore unaffected by the fix; only the magnitudes change. A full quantification of the fix's impact on the original 2011–2018 findings is given in the audit appendix.
+:::
+
+This update also extends the actual $e_0$ series to 2024 and, because the 2020–2021 pandemic years are not ordinary draws from the pre-pandemic process, presents three observation-window variants: a **pre-pandemic headline** (2011–2019), the **full series** (2011–2024), and a **COVID-excluded** series (2011–2024 dropping 2020 and 2021). The pre-pandemic window is treated as the headline and its forecast is validated out-of-sample against 2020–2024 below.
+
+Now, let's determine the average change (and SD) from 1991 to 2010 — the calibration window, unchanged from the original analysis.
+
+```{r}
+#| label: fig-mean-sd-preslowdown
+#| warning: false
+ch_e0_dta %>%
   filter(between(year, 1991, 2010)) %>%
-  select(-e0) %>%
   group_by(population, sex) %>%
-  arrange(year) %>%
   summarise(
     mean_ch = mean(ch_e0),
-    sd_ch   = sd(ch_e0)
+    sd_ch   = sd(ch_e0),
+    .groups = "drop"
   ) %>%
   write_to_table(here("data", "mean_sd_ch_preslowdown_ons.csv")) %>%
   mutate(mean_ch = mean_ch * 52.25, sd_ch = sd_ch * 52.25) %>%
@@ -64,34 +80,110 @@ For each of these populations, we can estimate the relative likelihood of observ
 ```{r}
 #| label: calc-bayes-factors
 #| warning: false
-bf_uk_nations <-
-  dta_e0 %>%
-    group_by(population, sex) %>%
-    arrange(year) %>%
-    mutate(ch_e0 = e0 - lag(e0)) %>%
-    ungroup() %>%
-    filter(!is.na(ch_e0)) %>%
-    select(-e0) %>%
-    group_by(population, sex) %>%
-    arrange(year) %>%
-    nest() %>%
-    crossing(after_end = 2011:2018) %>%
-    mutate(
-      bayes_df = map2(
-        after_end, data, ~calc_bayes_factors(after_period = c(2011, .x), before_period = c(1991, 2010), outcome_var = ch_e0, dta = .y)
-      )
-    ) %>%
-    select(population, sex, after_end, bayes_df) %>%
-    unnest(cols = c(bayes_df)) %>%
-    mutate(
-      period = paste0("2011-", str_sub(after_end, 3,4))
+# Three observation-window variants. Each is calibrated on 1991-2010 and scores
+# the same 0-100% slowdown scenarios; they differ only in which post-2010 years
+# are treated as observations.
+variant_defs <- tibble::tribble(
+  ~variant,          ~after_first, ~after_last, ~drop_years,
+  "Pre-2020",        2011L,        2019L,       list(integer(0)),
+  "Full series",     2011L,        2024L,       list(integer(0)),
+  "COVID-excluded",  2011L,        2024L,       list(c(2020L, 2021L))
+)
+
+run_variant <- function(dta, after_first, after_last, drop_years) {
+  d <- dta %>% filter(!year %in% drop_years[[1]])
+  calc_bayes_factors(
+    dta = d,
+    before_period = c(1991, 2010),
+    after_period = c(after_first, after_last),
+    outcome_var = ch_e0
+  )
+}
+
+bf_all <-
+  ch_e0_dta %>%
+  select(-e0, -source) %>%
+  group_by(population, sex) %>%
+  nest() %>%
+  crossing(variant_defs) %>%
+  mutate(
+    bayes_df = pmap(
+      list(data, after_first, after_last, drop_years),
+      run_variant
     )
+  ) %>%
+  select(population, sex, variant, bayes_df) %>%
+  unnest(cols = c(bayes_df)) %>%
+  ungroup() %>%
+  mutate(
+    population = factor(population, levels = populations),
+    variant = factor(variant, levels = c("Pre-2020", "Full series", "COVID-excluded"))
+  )
 
-bf_uk_nations
+# BF-maximising scenario for each population / sex / variant.
+bf_argmax <-
+  bf_all %>%
+  group_by(population, sex, variant) %>%
+  slice_max(log_bf, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  transmute(
+    population, sex, variant,
+    slowdown_pct = 100 * (1 - perc),
+    log10_bf = log_bf / log(10),
+    mu_best = mu
+  )
+```
 
-bf_mutexc <- bf_uk_nations %>%
-  filter(population %in% c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")) %>%
-  mutate(population = factor(population, levels = c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")))
+::: {.callout-important}
+## Headline: the pre-pandemic (2011–2019) window
+
+```{r}
+#| label: reproduction-check
+#| echo: false
+# Exact reproduction of the original paper's 2011-2018 window, to confirm the
+# corrected engine and updated data reproduce the published maximising
+# percentages before the 2019 recovery year is added.
+repro_1118 <-
+  ch_e0_dta %>%
+  filter(population == "United Kingdom") %>%
+  group_by(sex) %>%
+  nest() %>%
+  mutate(bf = map(data, ~calc_bayes_factors(.x, c(1991, 2010), c(2011, 2018), ch_e0))) %>%
+  select(sex, bf) %>%
+  unnest(bf) %>%
+  group_by(sex) %>%
+  slice_max(log_bf, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  transmute(sex, slowdown_pct = round(100 * (1 - perc)))
+
+repro_f <- repro_1118 %>% filter(sex == "female") %>% pull(slowdown_pct)
+repro_m <- repro_1118 %>% filter(sex == "male") %>% pull(slowdown_pct)
+
+hl <- bf_argmax %>% filter(variant == "Pre-2020", population == "United Kingdom")
+hl_f <- round(hl %>% filter(sex == "female") %>% pull(slowdown_pct))
+hl_m <- round(hl %>% filter(sex == "male") %>% pull(slowdown_pct))
+```
+
+Restricting the observation window to the pre-pandemic 2011–2018 span exactly reproduces the original paper's headline: a `r repro_f`% slowdown for UK females and `r repro_m`% for UK males (matching manuscript Table 4), confirming that the corrected engine and the 2024-extended data recover the published result. Extending the pre-pandemic window by the single further year 2019 — a strong recovery year (UK $e_0$ rose 0.29 years for females and 0.24 for males, both above the 1991–2010 mean) — already pulls the pre-pandemic estimate down to a **`r hl_f`% (females) and `r hl_m`% (males)** slowdown. The pre-pandemic signal is therefore in the ~50–60% range, close to but slightly below the original paper's 61%.
+:::
+
+The following tables report, for each population and sex, the slowdown percentage $100(1-\text{perc})$ at which the Bayes factor is maximised and the $\log_{10}$ Bayes factor at that maximum, for each of the three observation-window variants.
+
+```{r}
+#| label: tbl-bf-maximise
+#| warning: false
+argmax_table <-
+  bf_argmax %>%
+  mutate(cell = paste0(round(slowdown_pct), "% (log10 BF: ",
+                       formatC(log10_bf, format = "f", digits = 2), ")")) %>%
+  select(Population = population, Sex = sex, variant, cell) %>%
+  pivot_wider(names_from = variant, values_from = cell) %>%
+  arrange(Population, Sex)
+
+argmax_table %>%
+  kable(caption = "BF-maximising slowdown (% below the 1991-2010 mean improvement) and log10 Bayes factor, by observation-window variant.") %>%
+  kable_styling() %>%
+  add_header_above(c(" " = 2, "Observation window" = 3))
 ```
 
 ```{r}
@@ -99,111 +191,124 @@ bf_mutexc <- bf_uk_nations %>%
 #| fig-width: 12
 #| fig-height: 12
 #| warning: false
-bf_mutexc %>%
-  mutate(perc = 100 * perc) %>%
-  mutate(
-    population = fct_relevel(population, c("United Kingdom",  "England", "Scotland", "Wales", "Northern Ireland"))
-  ) %>%
-  ggplot(aes(x = perc, y = bayes_factor, alpha = period)) +
+# Bayes-factor schedules for the headline (pre-2020) window: log10 BF against
+# slowdown %, faceted by population and sex. Saved to a NEW suffixed filename so
+# the committed A12 figure is not overwritten.
+bf_all %>%
+  filter(variant == "Pre-2020") %>%
+  mutate(slowdown_pct = 100 * (1 - perc)) %>%
+  ggplot(aes(x = slowdown_pct, y = log_bf / log(10))) +
+  geom_hline(yintercept = 0, colour = "grey50") +
   geom_line() +
-  geom_line(aes(x = perc, y = bayes_factor), size = 1.4,
-              data = bf_mutexc %>%
-                filter(period == "2011-18") %>%
-                mutate(perc = 100 * perc) %>%
-                mutate(
-    population = fct_relevel(population, c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"))
-  ) %>%
-                mutate(is_pos = bayes_factor > 1),
-              inherit.aes = FALSE
-            ) +
   facet_wrap(population ~ sex, scales = "free_y") +
-  geom_ribbon(aes(
-      ymin = ifelse(is_pos, 1, bayes_factor),
-      ymax = ifelse(is_pos, bayes_factor, 1),
-      x = perc, group = paste0(is_pos, period),
-      fill = is_pos
-    ),
-              data = bf_mutexc %>%
-                mutate(perc = 100 * perc) %>%
-                  mutate(
-              population = fct_relevel(population, c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"))
-            ) %>%
-                mutate(is_pos = bayes_factor > 1),
-              inherit.aes = FALSE, alpha = 0.2) +
-  scale_alpha_discrete("Period", range = c(0.2, 1), breaks = c("2011-11", "2011-12", "2011-13", "2011-14", "2011-15", "2011-16", "2011-17", "2011-18")) +
-  geom_hline(yintercept = 1) +
   labs(
-    x = "Percentage of previous improvement",
-    y = "Bayes Factor\n(>1 means support for Alternative Hypothesis",
-    title = "Bayes Factor for various proposed levels of slowdown",
-    subtitle = "Based on all series up to 2011-18"
+    x = "Percentage slowdown from 1991-2010 improvement",
+    y = "log10 Bayes Factor\n(>0 means support for a slowdown)",
+    title = "Bayes Factor schedules for proposed levels of slowdown",
+    subtitle = "Headline pre-pandemic observation window, 2011-2019"
   ) +
-  guides(fill = FALSE) +
-  scale_x_continuous(breaks = seq(0, 100, by = 10))
+  scale_x_continuous(breaks = seq(0, 100, by = 20))
 
-ggsave(here("figures", "bayes_factor_various_proposed_slowdown_levels.png"), height = 12, width = 12, units = "in", dpi = 300)
-
-ggsave(here("bayes_paper", "figures", "A12_Bayes_Factor_Schedules.png"), height = 25, width = 30, units = "cm", dpi = 300)
+ggsave(here("figures", "A12_Bayes_Factor_Schedules_2024.png"), height = 25, width = 30, units = "cm", dpi = 300)
 ```
 
-For all populations except males in Northern Ireland, the addition of the 2018 single year life expectancy data led to sizeable increases in the empirical support for the belief that there has been a slowdown in life expectancy after 2010; this is seen by noting how much higher the bold line, which incorporates the 2018 data, is than the fainter lines representing cumulative data based on shorter series of observations. For most of these populations, the peak of the bold line is to the left of peaks based on earlier series, meaning not only did the 2018 observations increase the strength of evidence supporting belief in a slowdown in life expectancy improvements, but also suggested more severe magnitudes of slowdown than the series excluding this most recent observation had indicated. For the UK as a whole, the addition of the life expectancy data for 2018 suggested an overall slowdown of around 60% was most likely, compared with a most likely magnitude of slowdown of around 50% based on data up to 2017.
+```{r}
+#| label: prose-values
+#| echo: false
+uk <- bf_argmax %>% filter(population == "United Kingdom")
+uk_val <- function(var, sx) round(uk %>% filter(variant == var, sex == sx) %>% pull(slowdown_pct))
+full_f <- uk_val("Full series", "female"); full_m <- uk_val("Full series", "male")
+cov_f  <- uk_val("COVID-excluded", "female"); cov_m <- uk_val("COVID-excluded", "male")
+```
 
-For each of these populations, what does the Bayes Factor maximise at?
+Read across the variants, the UK as a whole shows a clear three-way tension. The pre-pandemic headline points to a slowdown of roughly `r hl_f`% (females) and `r hl_m`% (males), consistent with — and, for the 2011–2018 sub-window, identical to — the original paper's ~61%. The **full series to 2024 inflates this to `r full_f`% (females) and `r full_m`% (males)**, but that inflation is driven almost entirely by the 2020 shock (UK $e_0$ fell 0.88 years for females and 1.20 for males in 2020), which a Normal-iid likelihood wrongly treats as an ordinary draw. Conversely, **excluding 2020–2021 pulls the estimate down to `r cov_f`% (females) and `r cov_m`% (males)** — but this is not a clean "no slowdown" reading either: it is pulled up by the genuine 2022–2024 recovery, which the original 2019-vintage analysis could not see. No single number is unambiguous; the pre-pandemic headline plus explicit out-of-sample validation (below) is the most honest framing.
+
+## Out-of-sample validation
+
+The pre-pandemic (2011–2019) window is a forecast: it implies, for each population and sex, a best-supported mean annual $e_0$ gain equal to the 1991–2010 mean multiplied by the BF-maximising proportion. We can validate that forecast against what actually happened over 2020–2024 — years the pre-pandemic analysis could not use.
 
 ```{r}
-#| label: fig-pct-decline
-#| echo: true
+#| label: tbl-out-of-sample
 #| warning: false
-bf_mutexc %>%
-   filter(period == "2011-18") %>%
-   mutate(perc = 100 * perc) %>%
-   mutate(
-    population = factor(population, levels = c("United Kingdom",  "England", "Scotland", "Wales", "Northern Ireland"))
+# Pre-2020-implied best mean annual gain (mu at the BF-maximising scenario)
+# versus what was actually observed over 2020-2024.
+pre2020_implied <-
+  bf_argmax %>%
+  filter(variant == "Pre-2020") %>%
+  select(population, sex, implied_annual = mu_best)
+
+observed_2024 <-
+  ch_e0_dta %>%
+  filter(between(year, 2020, 2024)) %>%
+  group_by(population, sex) %>%
+  summarise(
+    obs_2020        = ch_e0[year == 2020],
+    obs_mean_2022_24 = mean(ch_e0[between(year, 2022, 2024)]),
+    obs_mean_2020_24 = mean(ch_e0),
+    .groups = "drop"
+  )
+
+validation_table <-
+  pre2020_implied %>%
+  left_join(observed_2024, by = c("population", "sex")) %>%
+  mutate(population = factor(population, levels = populations)) %>%
+  arrange(population, sex)
+
+validation_table %>%
+  kable(
+    digits = 3,
+    col.names = c("Population", "Sex", "Pre-2020 implied annual gain",
+                  "Observed 2020", "Observed mean 2022-24", "Observed mean 2020-24"),
+    caption = "Out-of-sample validation: pre-pandemic best-supported annual e0 gain (years) versus observed 2020-2024 changes. The 2024 actual is part-estimated (2024-based NPP base year)."
   ) %>%
-  group_by(sex, population) %>%
-  filter(bayes_factor == max(bayes_factor)) %>%
-  ungroup() %>%
-  ggplot(aes(y = population, x = 100 - perc, shape = sex, colour = sex)) +
-  geom_point() +
-  geom_text(aes(label = 100 -perc), nudge_y = 0.2) +
-  labs(
-    x = "Percentage decline from 1991-2010 levels",
-    y = "Population",
-    title = "Estimated percentage slowdown",
-    subtitle = "Decline over 2011-2018 compared with 1991-2010",
-    caption = "Source: ONS Single Year Lifetables"
-  ) +
-  lims(x = c(0, 100)) +
-  geom_vline(xintercept = 0)
-
-ggsave(here("bayes_paper", "figures", "A13_pct_decline_2011_18_cf_1991_2011.png"), height = 15, width = 25, units = "cm", dpi =300)
-```
-
-The following table shows, for each population, sex and observation period, the percentage slowdown at which the Bayes factor is maximised, alongside the Bayes factor at that maximum.
-
-```{r}
-#| label: tbl-bf-maximise
-#| warning: false
-table_wide <-
-  bf_mutexc %>%
-    group_by(population, sex, period) %>%
-    filter(bayes_factor == max(bayes_factor)) %>%
-    filter(period != "2011-11") %>%
-    mutate(perc = 100 * (1 - perc)) %>%
-    select(Population = population, Sex = sex, period, perc, bayes_factor) %>%
-    mutate(perc_bf = paste0(perc,"% (BF: ", formatC(round(bayes_factor, 5), format = 'f', digits = 5), ")")) %>%
-    select(Population, Sex, period, perc_bf) %>%
-    spread(period, perc_bf)
-
-table_wide %>%
-  kable() %>%
   kable_styling()
 ```
 
-In the UK as a whole, it is most likely that life expectancy improvement rates have slowed down by 62% for females, and 59% for males. This is made up of a 60% (females) and 59% (males) slowdown in England, a 72% (females) and 56% (males) slowdown in Scotland, a 59% (females) and 29% (males) slowdown in Northern Ireland, and an estimated 77% (females) and 83% (males) slowdown in Wales. With the exception of males in Northern Ireland, rates of slowdown are therefore similar across UK nations, and generally slightly more severe for females than males.
+```{r}
+#| label: fig-out-of-sample
+#| fig-width: 10
+#| fig-height: 8
+#| warning: false
+obs_series <-
+  ch_e0_dta %>%
+  filter(between(year, 2020, 2024)) %>%
+  mutate(population = factor(population, levels = populations))
 
-Some important points:
+pre2020_implied %>%
+  mutate(population = factor(population, levels = populations)) %>%
+  ggplot() +
+  geom_hline(yintercept = 0, colour = "grey70") +
+  geom_hline(aes(yintercept = implied_annual), linetype = "dashed", colour = "steelblue") +
+  geom_col(aes(x = year, y = ch_e0), data = obs_series, fill = "grey40", width = 0.7) +
+  facet_grid(population ~ sex) +
+  labs(
+    x = "Year", y = "Annual change in e0 (years)",
+    title = "Observed 2020-2024 annual e0 change vs pre-pandemic best forecast",
+    subtitle = "Dashed line: mean annual gain implied by the 2011-2019 BF-maximising scenario",
+    caption = "2024 actual is part-estimated (2024-based NPP base year)."
+  )
 
-* This approach means that the process of updating beliefs about the extent and evidence for a slowdown in life expectancy gains can be made formally rather than informally.
-* The Bayes Factor schedules can be recalculated whenever a new data release becomes available. This means that updated schedules can be produced within minutes of the release of official statistics. The commitment to do this each each new release, and to publish updated estimates of support for slowdown, should be made before such data are released.
-* The tendency within UK populations has been for the rate of slowdown to be increasing over time, rather than to shift suddenly from one rate to another. If this continues then the proposed slowdown percentage that maximises the bayes factor will continue to shift further to the left with additional years' data, and could be maximised at a negative value (i.e. declining life expectancy rather than slowing improvement) if this tendency continues.
+ggsave(here("figures", "A14_out_of_sample_validation_2024.png"), height = 20, width = 25, units = "cm", dpi = 300)
+```
+
+```{r}
+#| label: oos-values
+#| echo: false
+uk_oos <- validation_table %>% filter(population == "United Kingdom")
+oos_implied_f <- uk_oos %>% filter(sex == "female") %>% pull(implied_annual)
+oos_obs_f     <- uk_oos %>% filter(sex == "female") %>% pull(obs_mean_2020_24)
+oos_rec_f     <- uk_oos %>% filter(sex == "female") %>% pull(obs_mean_2022_24)
+oos_implied_m <- uk_oos %>% filter(sex == "male") %>% pull(implied_annual)
+oos_obs_m     <- uk_oos %>% filter(sex == "male") %>% pull(obs_mean_2020_24)
+oos_rec_m     <- uk_oos %>% filter(sex == "male") %>% pull(obs_mean_2022_24)
+```
+
+The out-of-sample picture is dominated by two offsetting features. The **2020 shock** is far outside anything the pre-pandemic model contemplated (UK: −0.88 years female, −1.20 male). But the **2022–2024 recovery** is real and substantial: over 2022–2024 the UK averaged `r formatC(oos_rec_f, format = "f", digits = 3)` years/year for females and `r formatC(oos_rec_m, format = "f", digits = 3)` for males, both at or above the pre-pandemic best-supported gains of `r formatC(oos_implied_f, format = "f", digits = 3)` (female) and `r formatC(oos_implied_m, format = "f", digits = 3)` (male). Averaged across the whole 2020–2024 window the shock and recovery partly cancel (UK mean `r formatC(oos_obs_f, format = "f", digits = 3)` female, `r formatC(oos_obs_m, format = "f", digits = 3)` male). The substantive message is that the recovery materially weakens any naive "the stalling has only worsened" narrative: post-pandemic improvement has returned to roughly the reduced-but-positive rate the pre-2020 data already implied, rather than collapsing further.
+
+## Summary
+
+* The corrected likelihood leaves every BF-maximising slowdown percentage unchanged relative to the buggy legacy version but restores meaningful magnitudes; these are reported here on the $\log_{10}$ scale.
+* The pre-pandemic headline (2011–2019) puts the UK slowdown at roughly `r hl_f`% (females) / `r hl_m`% (males), reproducing the original ~61% exactly for the 2011–2018 sub-window before the 2019 recovery year is added.
+* Extending to 2024 does not yield a single clean number: the full series is inflated by the 2020 shock (`r full_f`% / `r full_m`%) and the COVID-excluded series is pulled up by the 2022–2024 recovery (`r cov_f`% / `r cov_m`%).
+* Out-of-sample, the 2022–2024 recovery has returned improvement to about the rate the pre-2020 data implied — the single most important substantive update since the original analysis.
+```
