@@ -127,3 +127,45 @@ the pre-pandemic BF benchmark. The dramatic downward revision happened
 2012-2018; the newest rounds have largely stabilised. The fan figure's
 "sharp pessimism" is about the LEVEL (post-COVID starting point) more than
 the assumed rate of future gain.
+
+## Detection framework (the project's original purpose, revived)
+
+User's original inspiration: the "1-in-1000-year storm recurring within a
+lifetime" idea - how many anomalous years to reject "the longevity DGP is
+unchanged"? This is the formal complement to Hiam et al. 2023 (BMB)
+"Slowing down or returning to normal?", which poses the same question
+qualitatively. R/detection.R implements it. Key findings:
+
+- **Retrospective early warning (first year LR monitor fires, p<0.05):**
+  UK & England MALES fire in **2015** - using only 2011-2015 data, four
+  years before the original analysis. p-trajectory: crosses 0.05 in 2015,
+  0.003 by 2018, ~0 once COVID hits. This vindicates the "how few
+  observations" premise - but only for the high-signal male series.
+- Females NEVER fire pre-COVID (all p>0.08 through 2019); their apparent
+  2020 "detection" is the pandemic shock, not the trend. Honest framing:
+  the trend-based slowdown was detectable early for males, not for females.
+  NI barely fires at all. Same male>female split as the LR test, by an
+  independent route.
+- **Years-to-detect scales as 1/((1-k)^2):** a full stall (k=0) is
+  detectable in 1-3 yrs (UK), a half-slowdown in 4-12, a quarter-slowdown
+  in 14-47. So the answer to "how few years" depends sharply on severity
+  and signal-to-noise (mu0/sd0, much better for males).
+- **Negative autocorrelation speeds detection:** rho ~ -0.5 to -0.59 for
+  annual e0 change; the AR(1) correction roughly halves years-to-detect
+  (UK female half-slowdown 12->3 yrs). The same negative autocorrelation
+  White (2002) used to justify linear extrapolation also suppresses the
+  variance of multi-year means, making regime-change detection faster.
+- **Storm surprise:** a single <=0 male year is a 1-in-22 event under the
+  null; observing 4 of 14 post-2010 (expected 0.6) is a ~1-in-300 surprise.
+  Female 4 of 14 (expected 2.3) is ~1-in-5, unremarkable.
+
+Decision (user): reframe the paper AROUND this detection framework (not
+"monitoring index" - e_x, de_x/dt, SMRs are already monitoring indexes, so
+that framing isn't distinctive). Position explicitly as the quantitative
+complement to Hiam et al.
+
+## International comparison survives the HMD refresh
+On fresh common-window (2011-2019) HMD data, UK ranks 4th SLOWEST of 20
+high-income countries for mean annual e0 gain (both sexes); only USA, NZ,
+Canada slower. The "UK severe in international context" claim holds; the
+original "more severe than all except USA" becomes "among the slowest 3-4".
