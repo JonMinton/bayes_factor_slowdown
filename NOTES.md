@@ -169,3 +169,24 @@ On fresh common-window (2011-2019) HMD data, UK ranks 4th SLOWEST of 20
 high-income countries for mean annual e0 gain (both sexes); only USA, NZ,
 Canada slower. The "UK severe in international context" claim holds; the
 original "more severe than all except USA" becomes "among the slowest 3-4".
+
+## Dorling exchange: two readings of the early under-prediction
+Danny Dorling (former supervisor, Oxford; X thread reply to JM, 2026-07) raised
+the "what caused it" question for the pre-2010 under-projection: the systematic
+forecast shortfall could imply people lived longer than expected "because of an
+unknown reason - not because the methodology was faulty" (?biological: falling
+smoking, respiratory/CVD gains).
+
+JM's own framing differs subtly: forecasters simply thought linear improvement
+assumptions were too crude and optimistic, and imposed deceleration - a
+methodological/epistemic prior, not a missed real cause.
+
+The distinction (recorded in the manuscript Discussion, "Reading the early
+under-prediction"): Dorling locates the surprise IN THE WORLD (unmodelled real
+gain -> forecast error measures an unrecognised improvement); JM locates it IN
+THE MODEL (a standing prior that steady improvement can't persist, which simple
+linear extrapolation kept beating; White 2002, Oeppen & Vaupel 2002). Both can
+hold; they are different arguments. Symmetry noted: pre-2010 too pessimistic
+about a rising trend, mid-2010s too slow to accept a stalled one - the prior
+about the SHAPE of improvement lagged the data in both eras. Also added to the
+infographic Act I summary caption. Credit: (D. Dorling, personal communication).

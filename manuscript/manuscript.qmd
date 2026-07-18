@@ -1207,6 +1207,32 @@ prospective monitor — would give researchers and policymakers a shared, audita
 would sharpen "slowing down or returning to normal?" [@hiam2023slowing] into a
 question with a pre-agreed answer.
 
+**Reading the early under-prediction.** For most of the half-century studied here
+the sign of ONS forecast error was the opposite of the recent one: successive rounds
+*under*-predicted improvement, each revised upward on the last (@sec-projns). Two
+readings of this deserve to be distinguished, because although both may hold they
+locate the surprise in different places. The first, which we owe to Danny Dorling
+(personal communication, 2026), places it *in the world*: the repeated shortfall may
+reflect a real but unmodelled improvement — for instance the delayed mortality
+dividend of falling smoking prevalence, or sustained declines in cardiovascular and
+respiratory mortality — that the projections had no way to anticipate, so that the
+forecast error is a measurement of an unrecognised gain rather than a methodological
+fault. The second places it *in the model*: doubting that the long post-war rise
+could continue, forecasters repeatedly assumed it was too crude and optimistic to
+extrapolate and built in a deceleration toward a lower long-run rate — so that a
+naive straight-line projection of past gains would have out-predicted them
+[@white2002longevity; @oeppen2002broken]. These are not restatements of one another.
+The first is a claim about longevity; the second is a claim about forecasting
+practice — a standing prior that steady improvement cannot be trusted to persist. The
+detection framework is agnostic between them, but it sharpens the stakes: for four
+decades the data gave no warrant to reject continued improvement, and models that
+assumed otherwise paid for it in systematic error; only after 2010 does the same test
+find warrant to reject it — and then, on the evidence here, decisively only for males.
+The symmetry is worth stating plainly: the pre-2010 forecasts were too pessimistic
+about a trend that kept rising, and the mid-2010s forecasts were slow to accept a
+trend that had stopped — in both eras the forecasters' prior about the *shape* of
+improvement lagged what the accumulating data already implied.
+
 **Limitations.** Several caveats bound the conclusions. (i) The Normal-iid
 likelihood treats every annual change as an exchangeable draw, which the 2020
 pandemic year plainly is not; we address this pragmatically by holding the
