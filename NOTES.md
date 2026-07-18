@@ -107,3 +107,23 @@ BF-maximising slowdown (% below 1991-2010 mean improvement):
   model for 2020-21; (c) restrict the headline to pre-2020 and treat
   2020-24 as out-of-sample validation of the earlier forecast. (c) is
   cleanest and reframes the paper around forecast validation.
+
+## Re-run finding: the 2019 recovery year (important nuance)
+
+The pre-pandemic headline depends sharply on where you stop:
+- 2011-2018 window: UK 61%/61% slowdown (reproduces the original paper exactly).
+- 2011-2019 window: UK 49%/56%. The single extra year 2019 was a strong
+  recovery (UK e0 +0.29 F / +0.24 M, both above the 1991-2010 mean), which
+  pulls the estimated slowdown down by ~10 points.
+Implication: the original paper's headline was, unknowingly, sensitive to
+ending in 2018. 2019 already hinted at recovery before COVID. This
+strengthens the case for the forecast-validation framing over a single
+point estimate, and should be stated plainly in the manuscript.
+
+## Chapter 05 finding: newest rounds are NOT the pessimistic ones
+Contrary to first impression from the fan figure, the 2020/2022/2024 ONS
+rounds' implied mean annual gains sit close to (UK female slightly above)
+the pre-pandemic BF benchmark. The dramatic downward revision happened
+2012-2018; the newest rounds have largely stabilised. The fan figure's
+"sharp pessimism" is about the LEVEL (post-COVID starting point) more than
+the assumed rate of future gain.
