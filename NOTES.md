@@ -80,3 +80,30 @@ bottom of each section.
   improvement. Re-examine when updating the manuscript.
 - Manuscript prose inconsistency: calibration window described both as
   "1990 to 2010" and "1991-2010"; code uses changes for 1991-2010.
+
+## Re-run to 2024: the COVID-year conundrum (corrected engine)
+
+Corrected Bayes factors, calibration 1991-2010, observation window to 2024.
+BF-maximising slowdown (% below 1991-2010 mean improvement):
+
+| Population (UK) | Full series incl. 2020-21 | Excluding 2020-21 | Original 2011-2018 (pre-COVID) |
+|---|---|---|---|
+| UK female   | 65% | 30% | 61% |
+| UK male     | 74% | 39% | 61% |
+| Wales male  | 89% | 56% | 83% |
+
+- The 2020 shock is huge (UK e0 change 2020: -0.88 F / -1.20 M years) and
+  single-handedly inflates the full-series slowdown estimate.
+- **Three-way tension**: the "true" underlying slowdown could be read as
+  ~61% (pre-COVID trend, original paper), ~65-89% (full series, but
+  COVID-dominated), or ~30-56% (COVID-excluded, but pulled UP by genuine
+  2022-2024 recovery: +0.33/+0.38 in 2024). No single number is clean.
+- 2022-2024 show real recovery, which the original 2019-vintage paper could
+  not see. This materially weakens a naive "stalling has only worsened"
+  narrative and is the single most important substantive update.
+- Methodological point: a Normal-iid likelihood treats the 2020 shock as an
+  ordinary draw, which it plainly is not. Options for the manuscript: (a)
+  report all three windows transparently; (b) add a level-shift/outlier
+  model for 2020-21; (c) restrict the headline to pre-2020 and treat
+  2020-24 as out-of-sample validation of the earlier forecast. (c) is
+  cleanest and reframes the paper around forecast validation.
