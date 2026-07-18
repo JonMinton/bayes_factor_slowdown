@@ -1,0 +1,607 @@
+population,year,sex,e0,source
+England,1980,female,76.81,single_year_lifetables
+England,1981,female,77.11,single_year_lifetables
+England,1982,female,77.2,single_year_lifetables
+England,1983,female,77.45,single_year_lifetables
+England,1984,female,77.79,single_year_lifetables
+England,1985,female,77.59,single_year_lifetables
+England,1986,female,77.88,single_year_lifetables
+England,1987,female,78.17,single_year_lifetables
+England,1988,female,78.25,single_year_lifetables
+England,1989,female,78.35,single_year_lifetables
+England,1990,female,78.7,single_year_lifetables
+England,1991,female,78.78,single_year_lifetables
+England,1992,female,79.15,single_year_lifetables
+England,1993,female,79.01,single_year_lifetables
+England,1994,female,79.53,single_year_lifetables
+England,1995,female,79.45,single_year_lifetables
+England,1996,female,79.56,single_year_lifetables
+England,1997,female,79.72,single_year_lifetables
+England,1998,female,79.94,single_year_lifetables
+England,1999,female,80.03,single_year_lifetables
+England,2000,female,80.37,single_year_lifetables
+England,2001,female,80.6,single_year_lifetables
+England,2002,female,80.73,single_year_lifetables
+England,2003,female,80.7,single_year_lifetables
+England,2004,female,81.26,single_year_lifetables
+England,2005,female,81.42,single_year_lifetables
+England,2006,female,81.72,single_year_lifetables
+England,2007,female,81.89,single_year_lifetables
+England,2008,female,81.94,single_year_lifetables
+England,2009,female,82.47,single_year_lifetables
+England,2010,female,82.59,single_year_lifetables
+England,2011,female,82.96,single_year_lifetables
+England,2012,female,82.92,single_year_lifetables
+England,2013,female,82.99,single_year_lifetables
+England,2014,female,83.23,single_year_lifetables
+England,2015,female,82.96,single_year_lifetables
+England,2016,female,83.11,single_year_lifetables
+England,2017,female,83.23,single_year_lifetables
+England,2018,female,83.2,single_year_lifetables
+England,2019,female,83.51,npp_2024_based_historic
+England,2020,female,82.58,npp_2024_based_historic
+England,2021,female,82.8,npp_2024_based_historic
+England,2022,female,83.14,npp_2024_based_historic
+England,2023,female,83.21,npp_2024_based_historic
+England,2024,female,83.57,npp_2024_based_historic
+England,1980,male,70.8,single_year_lifetables
+England,1981,male,71.13,single_year_lifetables
+England,1982,male,71.29,single_year_lifetables
+England,1983,male,71.54,single_year_lifetables
+England,1984,male,71.95,single_year_lifetables
+England,1985,male,71.87,single_year_lifetables
+England,1986,male,72.09,single_year_lifetables
+England,1987,male,72.48,single_year_lifetables
+England,1988,male,72.6,single_year_lifetables
+England,1989,male,72.85,single_year_lifetables
+England,1990,male,73.08,single_year_lifetables
+England,1991,male,73.29,single_year_lifetables
+England,1992,male,73.74,single_year_lifetables
+England,1993,male,73.73,single_year_lifetables
+England,1994,male,74.3,single_year_lifetables
+England,1995,male,74.25,single_year_lifetables
+England,1996,male,74.48,single_year_lifetables
+England,1997,male,74.78,single_year_lifetables
+England,1998,male,74.97,single_year_lifetables
+England,1999,male,75.24,single_year_lifetables
+England,2000,male,75.64,single_year_lifetables
+England,2001,male,75.95,single_year_lifetables
+England,2002,male,76.11,single_year_lifetables
+England,2003,male,76.34,single_year_lifetables
+England,2004,male,76.88,single_year_lifetables
+England,2005,male,77.14,single_year_lifetables
+England,2006,male,77.46,single_year_lifetables
+England,2007,male,77.75,single_year_lifetables
+England,2008,male,77.89,single_year_lifetables
+England,2009,male,78.35,single_year_lifetables
+England,2010,male,78.68,single_year_lifetables
+England,2011,male,79.09,single_year_lifetables
+England,2012,male,79.26,single_year_lifetables
+England,2013,male,79.27,single_year_lifetables
+England,2014,male,79.51,single_year_lifetables
+England,2015,male,79.34,single_year_lifetables
+England,2016,male,79.52,single_year_lifetables
+England,2017,male,79.59,single_year_lifetables
+England,2018,male,79.55,single_year_lifetables
+England,2019,male,79.78,npp_2024_based_historic
+England,2020,male,78.53,npp_2024_based_historic
+England,2021,male,78.73,npp_2024_based_historic
+England,2022,male,79.25,npp_2024_based_historic
+England,2023,male,79.26,npp_2024_based_historic
+England,2024,male,79.69,npp_2024_based_historic
+England & Wales,1980,female,76.78,single_year_lifetables
+England & Wales,1981,female,77.07,single_year_lifetables
+England & Wales,1982,female,77.16,single_year_lifetables
+England & Wales,1983,female,77.41,single_year_lifetables
+England & Wales,1984,female,77.77,single_year_lifetables
+England & Wales,1985,female,77.56,single_year_lifetables
+England & Wales,1986,female,77.86,single_year_lifetables
+England & Wales,1987,female,78.15,single_year_lifetables
+England & Wales,1988,female,78.24,single_year_lifetables
+England & Wales,1989,female,78.32,single_year_lifetables
+England & Wales,1990,female,78.7,single_year_lifetables
+England & Wales,1991,female,78.77,single_year_lifetables
+England & Wales,1992,female,79.14,single_year_lifetables
+England & Wales,1993,female,78.99,single_year_lifetables
+England & Wales,1994,female,79.51,single_year_lifetables
+England & Wales,1995,female,79.42,single_year_lifetables
+England & Wales,1996,female,79.53,single_year_lifetables
+England & Wales,1997,female,79.69,single_year_lifetables
+England & Wales,1998,female,79.91,single_year_lifetables
+England & Wales,1999,female,79.99,single_year_lifetables
+England & Wales,2000,female,80.35,single_year_lifetables
+England & Wales,2001,female,80.56,single_year_lifetables
+England & Wales,2002,female,80.69,single_year_lifetables
+England & Wales,2003,female,80.67,single_year_lifetables
+England & Wales,2004,female,81.22,single_year_lifetables
+England & Wales,2005,female,81.39,single_year_lifetables
+England & Wales,2006,female,81.7,single_year_lifetables
+England & Wales,2007,female,81.84,single_year_lifetables
+England & Wales,2008,female,81.9,single_year_lifetables
+England & Wales,2009,female,82.43,single_year_lifetables
+England & Wales,2010,female,82.55,single_year_lifetables
+England & Wales,2011,female,82.92,single_year_lifetables
+England & Wales,2012,female,82.87,single_year_lifetables
+England & Wales,2013,female,82.94,single_year_lifetables
+England & Wales,2014,female,83.19,single_year_lifetables
+England & Wales,2015,female,82.9,single_year_lifetables
+England & Wales,2016,female,83.07,single_year_lifetables
+England & Wales,2017,female,83.18,single_year_lifetables
+England & Wales,2018,female,83.14,single_year_lifetables
+England & Wales,1980,male,70.77,single_year_lifetables
+England & Wales,1981,male,71.09,single_year_lifetables
+England & Wales,1982,male,71.26,single_year_lifetables
+England & Wales,1983,male,71.5,single_year_lifetables
+England & Wales,1984,male,71.92,single_year_lifetables
+England & Wales,1985,male,71.83,single_year_lifetables
+England & Wales,1986,male,72.05,single_year_lifetables
+England & Wales,1987,male,72.45,single_year_lifetables
+England & Wales,1988,male,72.59,single_year_lifetables
+England & Wales,1989,male,72.83,single_year_lifetables
+England & Wales,1990,male,73.06,single_year_lifetables
+England & Wales,1991,male,73.28,single_year_lifetables
+England & Wales,1992,male,73.73,single_year_lifetables
+England & Wales,1993,male,73.7,single_year_lifetables
+England & Wales,1994,male,74.26,single_year_lifetables
+England & Wales,1995,male,74.2,single_year_lifetables
+England & Wales,1996,male,74.45,single_year_lifetables
+England & Wales,1997,male,74.74,single_year_lifetables
+England & Wales,1998,male,74.95,single_year_lifetables
+England & Wales,1999,male,75.18,single_year_lifetables
+England & Wales,2000,male,75.59,single_year_lifetables
+England & Wales,2001,male,75.91,single_year_lifetables
+England & Wales,2002,male,76.08,single_year_lifetables
+England & Wales,2003,male,76.29,single_year_lifetables
+England & Wales,2004,male,76.84,single_year_lifetables
+England & Wales,2005,male,77.11,single_year_lifetables
+England & Wales,2006,male,77.43,single_year_lifetables
+England & Wales,2007,male,77.68,single_year_lifetables
+England & Wales,2008,male,77.85,single_year_lifetables
+England & Wales,2009,male,78.3,single_year_lifetables
+England & Wales,2010,male,78.63,single_year_lifetables
+England & Wales,2011,male,79.03,single_year_lifetables
+England & Wales,2012,male,79.2,single_year_lifetables
+England & Wales,2013,male,79.2,single_year_lifetables
+England & Wales,2014,male,79.46,single_year_lifetables
+England & Wales,2015,male,79.28,single_year_lifetables
+England & Wales,2016,male,79.44,single_year_lifetables
+England & Wales,2017,male,79.52,single_year_lifetables
+England & Wales,2018,male,79.47,single_year_lifetables
+Great Britain,1980,female,76.63,single_year_lifetables
+Great Britain,1981,female,76.91,single_year_lifetables
+Great Britain,1982,female,76.98,single_year_lifetables
+Great Britain,1983,female,77.24,single_year_lifetables
+Great Britain,1984,female,77.59,single_year_lifetables
+Great Britain,1985,female,77.39,single_year_lifetables
+Great Britain,1986,female,77.71,single_year_lifetables
+Great Britain,1987,female,77.99,single_year_lifetables
+Great Britain,1988,female,78.09,single_year_lifetables
+Great Britain,1989,female,78.11,single_year_lifetables
+Great Britain,1990,female,78.53,single_year_lifetables
+Great Britain,1991,female,78.62,single_year_lifetables
+Great Britain,1992,female,78.96,single_year_lifetables
+Great Britain,1993,female,78.79,single_year_lifetables
+Great Britain,1994,female,79.34,single_year_lifetables
+Great Britain,1995,female,79.25,single_year_lifetables
+Great Britain,1996,female,79.36,single_year_lifetables
+Great Britain,1997,female,79.53,single_year_lifetables
+Great Britain,1998,female,79.75,single_year_lifetables
+Great Britain,1999,female,79.82,single_year_lifetables
+Great Britain,2000,female,80.18,single_year_lifetables
+Great Britain,2001,female,80.4,single_year_lifetables
+Great Britain,2002,female,80.52,single_year_lifetables
+Great Britain,2003,female,80.5,single_year_lifetables
+Great Britain,2004,female,81.05,single_year_lifetables
+Great Britain,2005,female,81.21,single_year_lifetables
+Great Britain,2006,female,81.51,single_year_lifetables
+Great Britain,2007,female,81.64,single_year_lifetables
+Great Britain,2008,female,81.71,single_year_lifetables
+Great Britain,2009,female,82.23,single_year_lifetables
+Great Britain,2010,female,82.36,single_year_lifetables
+Great Britain,2011,female,82.72,single_year_lifetables
+Great Britain,2012,female,82.67,single_year_lifetables
+Great Britain,2013,female,82.76,single_year_lifetables
+Great Britain,2014,female,83.01,single_year_lifetables
+Great Britain,2015,female,82.72,single_year_lifetables
+Great Britain,2016,female,82.88,single_year_lifetables
+Great Britain,2017,female,82.99,single_year_lifetables
+Great Britain,2018,female,82.94,single_year_lifetables
+Great Britain,1980,male,70.6,single_year_lifetables
+Great Britain,1981,male,70.9,single_year_lifetables
+Great Britain,1982,male,71.07,single_year_lifetables
+Great Britain,1983,male,71.32,single_year_lifetables
+Great Britain,1984,male,71.73,single_year_lifetables
+Great Britain,1985,male,71.67,single_year_lifetables
+Great Britain,1986,male,71.87,single_year_lifetables
+Great Britain,1987,male,72.27,single_year_lifetables
+Great Britain,1988,male,72.39,single_year_lifetables
+Great Britain,1989,male,72.63,single_year_lifetables
+Great Britain,1990,male,72.88,single_year_lifetables
+Great Britain,1991,male,73.1,single_year_lifetables
+Great Britain,1992,male,73.53,single_year_lifetables
+Great Britain,1993,male,73.48,single_year_lifetables
+Great Britain,1994,male,74.06,single_year_lifetables
+Great Britain,1995,male,74.01,single_year_lifetables
+Great Britain,1996,male,74.22,single_year_lifetables
+Great Britain,1997,male,74.53,single_year_lifetables
+Great Britain,1998,male,74.74,single_year_lifetables
+Great Britain,1999,male,74.95,single_year_lifetables
+Great Britain,2000,male,75.37,single_year_lifetables
+Great Britain,2001,male,75.68,single_year_lifetables
+Great Britain,2002,male,75.83,single_year_lifetables
+Great Britain,2003,male,76.06,single_year_lifetables
+Great Britain,2004,male,76.61,single_year_lifetables
+Great Britain,2005,male,76.89,single_year_lifetables
+Great Britain,2006,male,77.19,single_year_lifetables
+Great Britain,2007,male,77.42,single_year_lifetables
+Great Britain,2008,male,77.61,single_year_lifetables
+Great Britain,2009,male,78.08,single_year_lifetables
+Great Britain,2010,male,78.41,single_year_lifetables
+Great Britain,2011,male,78.8,single_year_lifetables
+Great Britain,2012,male,78.98,single_year_lifetables
+Great Britain,2013,male,79,single_year_lifetables
+Great Britain,2014,male,79.27,single_year_lifetables
+Great Britain,2015,male,79.07,single_year_lifetables
+Great Britain,2016,male,79.22,single_year_lifetables
+Great Britain,2017,male,79.31,single_year_lifetables
+Great Britain,2018,male,79.25,single_year_lifetables
+Northern Ireland,1980,female,74.97,single_year_lifetables
+Northern Ireland,1981,female,75.89,single_year_lifetables
+Northern Ireland,1982,female,75.71,single_year_lifetables
+Northern Ireland,1983,female,76.39,single_year_lifetables
+Northern Ireland,1984,female,76.86,single_year_lifetables
+Northern Ireland,1985,female,76.79,single_year_lifetables
+Northern Ireland,1986,female,77.02,single_year_lifetables
+Northern Ireland,1987,female,77.55,single_year_lifetables
+Northern Ireland,1988,female,77.27,single_year_lifetables
+Northern Ireland,1989,female,77.74,single_year_lifetables
+Northern Ireland,1990,female,77.88,single_year_lifetables
+Northern Ireland,1991,female,78.43,single_year_lifetables
+Northern Ireland,1992,female,78.89,single_year_lifetables
+Northern Ireland,1993,female,78.37,single_year_lifetables
+Northern Ireland,1994,female,78.81,single_year_lifetables
+Northern Ireland,1995,female,78.75,single_year_lifetables
+Northern Ireland,1996,female,79.24,single_year_lifetables
+Northern Ireland,1997,female,79.48,single_year_lifetables
+Northern Ireland,1998,female,79.72,single_year_lifetables
+Northern Ireland,1999,female,79.17,single_year_lifetables
+Northern Ireland,2000,female,79.77,single_year_lifetables
+Northern Ireland,2001,female,80.33,single_year_lifetables
+Northern Ireland,2002,female,80.29,single_year_lifetables
+Northern Ireland,2003,female,80.63,single_year_lifetables
+Northern Ireland,2004,female,80.71,single_year_lifetables
+Northern Ireland,2005,female,81.12,single_year_lifetables
+Northern Ireland,2006,female,81.06,single_year_lifetables
+Northern Ireland,2007,female,81.38,single_year_lifetables
+Northern Ireland,2008,female,81.18,single_year_lifetables
+Northern Ireland,2009,female,81.41,single_year_lifetables
+Northern Ireland,2010,female,81.71,single_year_lifetables
+Northern Ireland,2011,female,82.4,single_year_lifetables
+Northern Ireland,2012,female,82.26,single_year_lifetables
+Northern Ireland,2013,female,82.22,single_year_lifetables
+Northern Ireland,2014,female,82.38,single_year_lifetables
+Northern Ireland,2015,female,82.22,single_year_lifetables
+Northern Ireland,2016,female,82.27,single_year_lifetables
+Northern Ireland,2017,female,82.43,single_year_lifetables
+Northern Ireland,2018,female,82.44,single_year_lifetables
+Northern Ireland,2019,female,82.78,npp_2024_based_historic
+Northern Ireland,2020,female,82.02,npp_2024_based_historic
+Northern Ireland,2021,female,82.1,npp_2024_based_historic
+Northern Ireland,2022,female,82.71,npp_2024_based_historic
+Northern Ireland,2023,female,82.67,npp_2024_based_historic
+Northern Ireland,2024,female,82.47,npp_2024_based_historic
+Northern Ireland,1980,male,68.25,single_year_lifetables
+Northern Ireland,1981,male,69.28,single_year_lifetables
+Northern Ireland,1982,male,69.99,single_year_lifetables
+Northern Ireland,1983,male,69.95,single_year_lifetables
+Northern Ireland,1984,male,70.46,single_year_lifetables
+Northern Ireland,1985,male,70.55,single_year_lifetables
+Northern Ireland,1986,male,70.7,single_year_lifetables
+Northern Ireland,1987,male,71.46,single_year_lifetables
+Northern Ireland,1988,male,71.26,single_year_lifetables
+Northern Ireland,1989,male,71.74,single_year_lifetables
+Northern Ireland,1990,male,72.19,single_year_lifetables
+Northern Ireland,1991,male,72.48,single_year_lifetables
+Northern Ireland,1992,male,72.99,single_year_lifetables
+Northern Ireland,1993,male,72.73,single_year_lifetables
+Northern Ireland,1994,male,73.29,single_year_lifetables
+Northern Ireland,1995,male,73.31,single_year_lifetables
+Northern Ireland,1996,male,73.92,single_year_lifetables
+Northern Ireland,1997,male,74.24,single_year_lifetables
+Northern Ireland,1998,male,74.33,single_year_lifetables
+Northern Ireland,1999,male,74.24,single_year_lifetables
+Northern Ireland,2000,male,74.86,single_year_lifetables
+Northern Ireland,2001,male,75.27,single_year_lifetables
+Northern Ireland,2002,male,75.44,single_year_lifetables
+Northern Ireland,2003,male,75.93,single_year_lifetables
+Northern Ireland,2004,male,76.06,single_year_lifetables
+Northern Ireland,2005,male,75.98,single_year_lifetables
+Northern Ireland,2006,male,76.19,single_year_lifetables
+Northern Ireland,2007,male,76.25,single_year_lifetables
+Northern Ireland,2008,male,76.54,single_year_lifetables
+Northern Ireland,2009,male,77.2,single_year_lifetables
+Northern Ireland,2010,male,77.16,single_year_lifetables
+Northern Ireland,2011,male,77.85,single_year_lifetables
+Northern Ireland,2012,male,78.05,single_year_lifetables
+Northern Ireland,2013,male,78.07,single_year_lifetables
+Northern Ireland,2014,male,78.61,single_year_lifetables
+Northern Ireland,2015,male,78.17,single_year_lifetables
+Northern Ireland,2016,male,78.75,single_year_lifetables
+Northern Ireland,2017,male,78.38,single_year_lifetables
+Northern Ireland,2018,male,78.84,single_year_lifetables
+Northern Ireland,2019,male,79.05,npp_2024_based_historic
+Northern Ireland,2020,male,78.23999999999998,npp_2024_based_historic
+Northern Ireland,2021,male,78.18,npp_2024_based_historic
+Northern Ireland,2022,male,78.87,npp_2024_based_historic
+Northern Ireland,2023,male,79.22,npp_2024_based_historic
+Northern Ireland,2024,male,78.28,npp_2024_based_historic
+Scotland,1980,female,75.21,single_year_lifetables
+Scotland,1981,female,75.44,single_year_lifetables
+Scotland,1982,female,75.26,single_year_lifetables
+Scotland,1983,female,75.7,single_year_lifetables
+Scotland,1984,female,75.91,single_year_lifetables
+Scotland,1985,female,75.84,single_year_lifetables
+Scotland,1986,female,76.25,single_year_lifetables
+Scotland,1987,female,76.53,single_year_lifetables
+Scotland,1988,female,76.7,single_year_lifetables
+Scotland,1989,female,76.17,single_year_lifetables
+Scotland,1990,female,76.92,single_year_lifetables
+Scotland,1991,female,77.13,single_year_lifetables
+Scotland,1992,female,77.27,single_year_lifetables
+Scotland,1993,female,76.96,single_year_lifetables
+Scotland,1994,female,77.7,single_year_lifetables
+Scotland,1995,female,77.67,single_year_lifetables
+Scotland,1996,female,77.8,single_year_lifetables
+Scotland,1997,female,78.08,single_year_lifetables
+Scotland,1998,female,78.21,single_year_lifetables
+Scotland,1999,female,78.23,single_year_lifetables
+Scotland,2000,female,78.63,single_year_lifetables
+Scotland,2001,female,78.83,single_year_lifetables
+Scotland,2002,female,78.89,single_year_lifetables
+Scotland,2003,female,78.88,single_year_lifetables
+Scotland,2004,female,79.41,single_year_lifetables
+Scotland,2005,female,79.47,single_year_lifetables
+Scotland,2006,female,79.77,single_year_lifetables
+Scotland,2007,female,79.81,single_year_lifetables
+Scotland,2008,female,79.93,single_year_lifetables
+Scotland,2009,female,80.41,single_year_lifetables
+Scotland,2010,female,80.61,single_year_lifetables
+Scotland,2011,female,80.82,single_year_lifetables
+Scotland,2012,female,80.8,single_year_lifetables
+Scotland,2013,female,81.04,single_year_lifetables
+Scotland,2014,female,81.34,single_year_lifetables
+Scotland,2015,female,81.03,single_year_lifetables
+Scotland,2016,female,81.08,single_year_lifetables
+Scotland,2017,female,81.16,single_year_lifetables
+Scotland,2018,female,81.01,single_year_lifetables
+Scotland,2019,female,81.22,npp_2024_based_historic
+Scotland,2020,female,80.70999999999998,npp_2024_based_historic
+Scotland,2021,female,80.52,npp_2024_based_historic
+Scotland,2022,female,80.9,npp_2024_based_historic
+Scotland,2023,female,80.98999999999998,npp_2024_based_historic
+Scotland,2024,female,81.31999999999998,npp_2024_based_historic
+Scotland,1980,male,68.97,single_year_lifetables
+Scotland,1981,male,69.12,single_year_lifetables
+Scotland,1982,male,69.24,single_year_lifetables
+Scotland,1983,male,69.64,single_year_lifetables
+Scotland,1984,male,69.9,single_year_lifetables
+Scotland,1985,male,70.06,single_year_lifetables
+Scotland,1986,male,70.08,single_year_lifetables
+Scotland,1987,male,70.49,single_year_lifetables
+Scotland,1988,male,70.48,single_year_lifetables
+Scotland,1989,male,70.66,single_year_lifetables
+Scotland,1990,male,71.13,single_year_lifetables
+Scotland,1991,male,71.4,single_year_lifetables
+Scotland,1992,male,71.6,single_year_lifetables
+Scotland,1993,male,71.4,single_year_lifetables
+Scotland,1994,male,72.11,single_year_lifetables
+Scotland,1995,male,72.12,single_year_lifetables
+Scotland,1996,male,72.01,single_year_lifetables
+Scotland,1997,male,72.56,single_year_lifetables
+Scotland,1998,male,72.64,single_year_lifetables
+Scotland,1999,male,72.71,single_year_lifetables
+Scotland,2000,male,73.18,single_year_lifetables
+Scotland,2001,male,73.4,single_year_lifetables
+Scotland,2002,male,73.35,single_year_lifetables
+Scotland,2003,male,73.75,single_year_lifetables
+Scotland,2004,male,74.26,single_year_lifetables
+Scotland,2005,male,74.69,single_year_lifetables
+Scotland,2006,male,74.83,single_year_lifetables
+Scotland,2007,male,74.86,single_year_lifetables
+Scotland,2008,male,75.28,single_year_lifetables
+Scotland,2009,male,75.9,single_year_lifetables
+Scotland,2010,male,76.21,single_year_lifetables
+Scotland,2011,male,76.5,single_year_lifetables
+Scotland,2012,male,76.79,single_year_lifetables
+Scotland,2013,male,77.02,single_year_lifetables
+Scotland,2014,male,77.32,single_year_lifetables
+Scotland,2015,male,76.95,single_year_lifetables
+Scotland,2016,male,76.96,single_year_lifetables
+Scotland,2017,male,77.13,single_year_lifetables
+Scotland,2018,male,77.05,single_year_lifetables
+Scotland,2019,male,77.22,npp_2024_based_historic
+Scotland,2020,male,76.15,npp_2024_based_historic
+Scotland,2021,male,76.39,npp_2024_based_historic
+Scotland,2022,male,77.06999999999998,npp_2024_based_historic
+Scotland,2023,male,76.91,npp_2024_based_historic
+Scotland,2024,male,77.41,npp_2024_based_historic
+United Kingdom,1980,female,76.59,single_year_lifetables
+United Kingdom,1981,female,76.88,single_year_lifetables
+United Kingdom,1982,female,76.94,single_year_lifetables
+United Kingdom,1983,female,77.22,single_year_lifetables
+United Kingdom,1984,female,77.57,single_year_lifetables
+United Kingdom,1985,female,77.38,single_year_lifetables
+United Kingdom,1986,female,77.69,single_year_lifetables
+United Kingdom,1987,female,77.98,single_year_lifetables
+United Kingdom,1988,female,78.07,single_year_lifetables
+United Kingdom,1989,female,78.1,single_year_lifetables
+United Kingdom,1990,female,78.51,single_year_lifetables
+United Kingdom,1991,female,78.61,single_year_lifetables
+United Kingdom,1992,female,78.96,single_year_lifetables
+United Kingdom,1993,female,78.78,single_year_lifetables
+United Kingdom,1994,female,79.32,single_year_lifetables
+United Kingdom,1995,female,79.24,single_year_lifetables
+United Kingdom,1996,female,79.36,single_year_lifetables
+United Kingdom,1997,female,79.53,single_year_lifetables
+United Kingdom,1998,female,79.75,single_year_lifetables
+United Kingdom,1999,female,79.8,single_year_lifetables
+United Kingdom,2000,female,80.17,single_year_lifetables
+United Kingdom,2001,female,80.4,single_year_lifetables
+United Kingdom,2002,female,80.51,single_year_lifetables
+United Kingdom,2003,female,80.5,single_year_lifetables
+United Kingdom,2004,female,81.04,single_year_lifetables
+United Kingdom,2005,female,81.2,single_year_lifetables
+United Kingdom,2006,female,81.5,single_year_lifetables
+United Kingdom,2007,female,81.63,single_year_lifetables
+United Kingdom,2008,female,81.69,single_year_lifetables
+United Kingdom,2009,female,82.21,single_year_lifetables
+United Kingdom,2010,female,82.34,single_year_lifetables
+United Kingdom,2011,female,82.71,single_year_lifetables
+United Kingdom,2012,female,82.66,single_year_lifetables
+United Kingdom,2013,female,82.74,single_year_lifetables
+United Kingdom,2014,female,82.99,single_year_lifetables
+United Kingdom,2015,female,82.71,single_year_lifetables
+United Kingdom,2016,female,82.87,single_year_lifetables
+United Kingdom,2017,female,82.98,single_year_lifetables
+United Kingdom,2018,female,82.93,single_year_lifetables
+United Kingdom,2019,female,83.22,npp_2024_based_historic
+United Kingdom,2020,female,82.34,npp_2024_based_historic
+United Kingdom,2021,female,82.53,npp_2024_based_historic
+United Kingdom,2022,female,82.87,npp_2024_based_historic
+United Kingdom,2023,female,82.94,npp_2024_based_historic
+United Kingdom,2024,female,83.27,npp_2024_based_historic
+United Kingdom,1980,male,70.54,single_year_lifetables
+United Kingdom,1981,male,70.86,single_year_lifetables
+United Kingdom,1982,male,71.04,single_year_lifetables
+United Kingdom,1983,male,71.28,single_year_lifetables
+United Kingdom,1984,male,71.7,single_year_lifetables
+United Kingdom,1985,male,71.64,single_year_lifetables
+United Kingdom,1986,male,71.84,single_year_lifetables
+United Kingdom,1987,male,72.25,single_year_lifetables
+United Kingdom,1988,male,72.36,single_year_lifetables
+United Kingdom,1989,male,72.61,single_year_lifetables
+United Kingdom,1990,male,72.86,single_year_lifetables
+United Kingdom,1991,male,73.09,single_year_lifetables
+United Kingdom,1992,male,73.51,single_year_lifetables
+United Kingdom,1993,male,73.46,single_year_lifetables
+United Kingdom,1994,male,74.04,single_year_lifetables
+United Kingdom,1995,male,73.99,single_year_lifetables
+United Kingdom,1996,male,74.21,single_year_lifetables
+United Kingdom,1997,male,74.52,single_year_lifetables
+United Kingdom,1998,male,74.73,single_year_lifetables
+United Kingdom,1999,male,74.93,single_year_lifetables
+United Kingdom,2000,male,75.36,single_year_lifetables
+United Kingdom,2001,male,75.67,single_year_lifetables
+United Kingdom,2002,male,75.82,single_year_lifetables
+United Kingdom,2003,male,76.06,single_year_lifetables
+United Kingdom,2004,male,76.59,single_year_lifetables
+United Kingdom,2005,male,76.86,single_year_lifetables
+United Kingdom,2006,male,77.16,single_year_lifetables
+United Kingdom,2007,male,77.39,single_year_lifetables
+United Kingdom,2008,male,77.58,single_year_lifetables
+United Kingdom,2009,male,78.06,single_year_lifetables
+United Kingdom,2010,male,78.38,single_year_lifetables
+United Kingdom,2011,male,78.77,single_year_lifetables
+United Kingdom,2012,male,78.95,single_year_lifetables
+United Kingdom,2013,male,78.98,single_year_lifetables
+United Kingdom,2014,male,79.25,single_year_lifetables
+United Kingdom,2015,male,79.04,single_year_lifetables
+United Kingdom,2016,male,79.21,single_year_lifetables
+United Kingdom,2017,male,79.28,single_year_lifetables
+United Kingdom,2018,male,79.24,single_year_lifetables
+United Kingdom,2019,male,79.48,npp_2024_based_historic
+United Kingdom,2020,male,78.28,npp_2024_based_historic
+United Kingdom,2021,male,78.45999999999998,npp_2024_based_historic
+United Kingdom,2022,male,79.01,npp_2024_based_historic
+United Kingdom,2023,male,79,npp_2024_based_historic
+United Kingdom,2024,male,79.38,npp_2024_based_historic
+Wales,1980,female,76.35,single_year_lifetables
+Wales,1981,female,76.34,single_year_lifetables
+Wales,1982,female,76.57,single_year_lifetables
+Wales,1983,female,76.76,single_year_lifetables
+Wales,1984,female,77.52,single_year_lifetables
+Wales,1985,female,77.14,single_year_lifetables
+Wales,1986,female,77.58,single_year_lifetables
+Wales,1987,female,77.88,single_year_lifetables
+Wales,1988,female,78.19,single_year_lifetables
+Wales,1989,female,77.95,single_year_lifetables
+Wales,1990,female,78.67,single_year_lifetables
+Wales,1991,female,78.75,single_year_lifetables
+Wales,1992,female,78.92,single_year_lifetables
+Wales,1993,female,78.66,single_year_lifetables
+Wales,1994,female,79.23,single_year_lifetables
+Wales,1995,female,78.92,single_year_lifetables
+Wales,1996,female,79.05,single_year_lifetables
+Wales,1997,female,79.17,single_year_lifetables
+Wales,1998,female,79.49,single_year_lifetables
+Wales,1999,female,79.33,single_year_lifetables
+Wales,2000,female,79.91,single_year_lifetables
+Wales,2001,female,79.97,single_year_lifetables
+Wales,2002,female,80.16,single_year_lifetables
+Wales,2003,female,80.21,single_year_lifetables
+Wales,2004,female,80.61,single_year_lifetables
+Wales,2005,female,80.87,single_year_lifetables
+Wales,2006,female,81.3,single_year_lifetables
+Wales,2007,female,81.08,single_year_lifetables
+Wales,2008,female,81.29,single_year_lifetables
+Wales,2009,female,81.84,single_year_lifetables
+Wales,2010,female,81.85,single_year_lifetables
+Wales,2011,female,82.33,single_year_lifetables
+Wales,2012,female,82.09,single_year_lifetables
+Wales,2013,female,82.13,single_year_lifetables
+Wales,2014,female,82.61,single_year_lifetables
+Wales,2015,female,82.03,single_year_lifetables
+Wales,2016,female,82.42,single_year_lifetables
+Wales,2017,female,82.39,single_year_lifetables
+Wales,2018,female,82.19,single_year_lifetables
+Wales,2019,female,82.26,npp_2024_based_historic
+Wales,2020,female,81.55,npp_2024_based_historic
+Wales,2021,female,81.9,npp_2024_based_historic
+Wales,2022,female,82.04,npp_2024_based_historic
+Wales,2023,female,82.12,npp_2024_based_historic
+Wales,2024,female,82.39,npp_2024_based_historic
+Wales,1980,male,70.29,single_year_lifetables
+Wales,1981,male,70.44,single_year_lifetables
+Wales,1982,male,70.8,single_year_lifetables
+Wales,1983,male,70.81,single_year_lifetables
+Wales,1984,male,71.55,single_year_lifetables
+Wales,1985,male,71.18,single_year_lifetables
+Wales,1986,male,71.49,single_year_lifetables
+Wales,1987,male,71.97,single_year_lifetables
+Wales,1988,male,72.47,single_year_lifetables
+Wales,1989,male,72.52,single_year_lifetables
+Wales,1990,male,72.76,single_year_lifetables
+Wales,1991,male,73.11,single_year_lifetables
+Wales,1992,male,73.48,single_year_lifetables
+Wales,1993,male,73.13,single_year_lifetables
+Wales,1994,male,73.68,single_year_lifetables
+Wales,1995,male,73.45,single_year_lifetables
+Wales,1996,male,73.95,single_year_lifetables
+Wales,1997,male,74.03,single_year_lifetables
+Wales,1998,male,74.59,single_year_lifetables
+Wales,1999,male,74.27,single_year_lifetables
+Wales,2000,male,74.89,single_year_lifetables
+Wales,2001,male,75.29,single_year_lifetables
+Wales,2002,male,75.6,single_year_lifetables
+Wales,2003,male,75.51,single_year_lifetables
+Wales,2004,male,76.22,single_year_lifetables
+Wales,2005,male,76.58,single_year_lifetables
+Wales,2006,male,76.87,single_year_lifetables
+Wales,2007,male,76.57,single_year_lifetables
+Wales,2008,male,77.15,single_year_lifetables
+Wales,2009,male,77.5,single_year_lifetables
+Wales,2010,male,77.88,single_year_lifetables
+Wales,2011,male,78.09,single_year_lifetables
+Wales,2012,male,78.23,single_year_lifetables
+Wales,2013,male,78.16,single_year_lifetables
+Wales,2014,male,78.79,single_year_lifetables
+Wales,2015,male,78.27,single_year_lifetables
+Wales,2016,male,78.23,single_year_lifetables
+Wales,2017,male,78.45,single_year_lifetables
+Wales,2018,male,78.23,single_year_lifetables
+Wales,2019,male,78.64,npp_2024_based_historic
+Wales,2020,male,77.67,npp_2024_based_historic
+Wales,2021,male,77.68,npp_2024_based_historic
+Wales,2022,male,78.47,npp_2024_based_historic
+Wales,2023,male,78.04,npp_2024_based_historic
+Wales,2024,male,78.27,npp_2024_based_historic
