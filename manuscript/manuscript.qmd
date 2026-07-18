@@ -1,6 +1,6 @@
 ---
 title: "Running to a standstill"
-subtitle: "A transparent monitoring index for the post-2010 UK life-expectancy slowdown"
+subtitle: "How many years of stalled improvement does it take to conclude the fundamentals have changed? A detection framework for the UK life-expectancy slowdown"
 author: "Jon Minton"
 date: today
 bibliography: ../references.bib
@@ -43,6 +43,9 @@ rp <- function(...) file.path(ROOT, ...)
 # R/monitoring_index.R and the audit appendix audit/get_ll_fix_impact.qmd.
 source(rp("R", "bayes_factors.R"))
 source(rp("R", "monitoring_index.R"))
+# Detection engine (R/detection.R): storm_probability(), years_to_detect(),
+# first_detection_year(). This is the paper's centrepiece — see @sec-detect.
+source(rp("R", "detection.R"))
 
 populations <- c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")
 
@@ -231,62 +234,164 @@ uk_get <- function(sx, rd) uk_cmp %>% filter(sex == sx, round == rd) %>% pull(on
 bf_f <- bf_benchmark %>% filter(population == "United Kingdom", sex == "female") %>% pull(bf_mu)
 bf_m <- bf_benchmark %>% filter(population == "United Kingdom", sex == "male")   %>% pull(bf_mu)
 
+# ============================================================================
+# DETECTION FRAMEWORK (centrepiece; R/detection.R). All quantities below are
+# computed from the calibration DGP Normal(mu0, sigma0^2) fitted to the annual
+# e0 changes 1991-2010, and reproduce the figures in NOTES.md.
+# ============================================================================
+
+# Calibration mean/SD per population and sex.
+calib_sd <- ch_e0_dta %>%
+  filter(between(year, 1991, 2010)) %>%
+  group_by(population, sex) %>%
+  summarise(mu0 = mean(ch_e0), sd0 = sd(ch_e0), .groups = "drop")
+
+# --- (A) Storm surprise ------------------------------------------------------
+storm_tbl <- calib_sd %>%
+  rowwise() %>%
+  mutate(sp = list(storm_probability(mu0, sd0, threshold = 0))) %>%
+  unnest(sp) %>% ungroup()
+
+# Observed "bad" (<=0) years post-2010 and their binomial surprise.
+badyears <- ch_e0_dta %>%
+  filter(between(year, 2011, 2024)) %>%
+  group_by(population, sex) %>%
+  summarise(n_post = n(), n_bad = sum(ch_e0 <= 0), .groups = "drop") %>%
+  left_join(storm_tbl %>% select(population, sex, p_year), by = c("population", "sex")) %>%
+  mutate(exp_bad = p_year * n_post,
+         p_ge = pbinom(n_bad - 1, n_post, p_year, lower.tail = FALSE),
+         odds_ge = 1 / p_ge)
+
+storm_get <- function(pop, sx, col) storm_tbl %>% filter(population == pop, sex == sx) %>% pull({{ col }})
+bad_get   <- function(pop, sx, col) badyears  %>% filter(population == pop, sex == sx) %>% pull({{ col }})
+
+# --- (B) Years-to-detect power table ----------------------------------------
+ k_grid <- c(0, 0.5, 0.75)
+ytd_tbl <- expand_grid(population = populations, sex = c("male", "female"), k = k_grid) %>%
+  left_join(calib_sd, by = c("population", "sex")) %>%
+  rowwise() %>%
+  mutate(iid = years_to_detect(mu0, sd0, k, alpha = 0.05, rho = 0),
+         ar1 = years_to_detect(mu0, sd0, k, alpha = 0.05, rho = -0.5)) %>%
+  ungroup() %>%
+  mutate(population = factor(population, levels = populations))
+
+ytd_get <- function(pop, sx, kk, col) ytd_tbl %>%
+  filter(population == pop, sex == sx, k == kk) %>% pull({{ col }})
+
+# --- (C) Retrospective early warning ----------------------------------------
+detect_tbl <- ch_e0_dta %>%
+  group_by(population, sex) %>% nest() %>%
+  mutate(res = map(data, ~first_detection_year(.x, c(1991, 2010), ch_e0, 2011, 2024, 0.05)),
+         first_year = map_int(res, "first_year")) %>%
+  select(population, sex, first_year) %>% ungroup() %>%
+  mutate(population = factor(population, levels = populations)) %>%
+  arrange(population, sex)
+detect_get <- function(pop, sx) detect_tbl %>% filter(population == pop, sex == sx) %>% pull(first_year)
+
+# UK-male p-value trajectory (accumulating from 2011).
+ukm_traj <- ch_e0_dta %>% filter(population == "United Kingdom", sex == "male") %>%
+  first_detection_year(c(1991, 2010), ch_e0, 2011, 2024, 0.05) %>% .$trajectory
+ukm_p <- function(yr) ukm_traj %>% filter(end == yr) %>% pull(p_value)
+
+# UK-female trajectory: the minimum accumulated p-value pre-COVID (2011-2019),
+# used to make the honesty note about the female series concrete.
+ukf_traj <- ch_e0_dta %>% filter(population == "United Kingdom", sex == "female") %>%
+  first_detection_year(c(1991, 2010), ch_e0, 2011, 2024, 0.05) %>% .$trajectory
+ukf_min_pre2020 <- ukf_traj %>% filter(end <= 2019) %>% pull(p_value) %>% min()
+
+# Lag-1 autocorrelation of annual e0 change (UK, pre-COVID), the empirical
+# basis for the AR(1) rho used above.
+acf1 <- function(sx) {
+  v <- ch_e0_dta %>% filter(population == "United Kingdom", sex == sx,
+                            between(year, 1991, 2019)) %>% arrange(year) %>% pull(ch_e0)
+  as.numeric(acf(v, plot = FALSE, lag.max = 1)$acf[2])
+}
+acf1_m <- acf1("male"); acf1_f <- acf1("female")
+
+# --- International refresh (current HMD vintage, common window 2011-2019) ----
+intl_comparators <- c("GBR_NP","USA","DEUTNP","FRATNP","NLD","ESP","ITA","JPN","CAN","SWE",
+                      "NOR","DNK","FIN","CHE","AUT","BEL","IRL","AUS","NZL_NP","PRT")
+intl_labels <- c(GBR_NP="United Kingdom", USA="USA", DEUTNP="Germany", FRATNP="France",
+                 NLD="Netherlands", ESP="Spain", ITA="Italy", JPN="Japan", CAN="Canada",
+                 SWE="Sweden", NOR="Norway", DNK="Denmark", FIN="Finland", CHE="Switzerland",
+                 AUT="Austria", BEL="Belgium", IRL="Ireland", AUS="Australia",
+                 NZL_NP="New Zealand", PRT="Portugal")
+hmd_raw <- read_csv(rp("data", "e0_hmd_2024vintage.csv"), show_col_types = FALSE)
+intl_rank <- hmd_raw %>%
+  filter(country %in% intl_comparators) %>%
+  group_by(country, sex) %>% arrange(year) %>% mutate(ch = e0 - lag(e0)) %>% ungroup() %>%
+  filter(between(year, 2011, 2019)) %>%
+  group_by(country, sex) %>%
+  summarise(mean_gain = mean(ch, na.rm = TRUE), .groups = "drop") %>%
+  mutate(Country = intl_labels[country]) %>%
+  group_by(sex) %>% arrange(mean_gain, .by_group = TRUE) %>%
+  mutate(rank = row_number()) %>% ungroup()
+intl_n <- n_distinct(intl_rank$country)
+uk_rank_m <- intl_rank %>% filter(country == "GBR_NP", sex == "male") %>% pull(rank)
+uk_rank_f <- intl_rank %>% filter(country == "GBR_NP", sex == "female") %>% pull(rank)
+intl_slower <- function(sx) intl_rank %>% filter(sex == sx, country != "GBR_NP",
+  rank < intl_rank %>% filter(country == "GBR_NP", sex == sx) %>% pull(rank)) %>%
+  arrange(rank) %>% pull(Country)
+
 f2 <- function(x) formatC(x, format = "f", digits = 2)
 f3 <- function(x) formatC(x, format = "f", digits = 3)
+f0 <- function(x) formatC(round(x), format = "d", big.mark = ",")
 ```
 
 # Abstract {.unnumbered}
 
-**Background.** The UK Office for National Statistics (ONS) revises its national
-life-expectancy projections every two years. Through the 2000s these
-projections repeatedly *under*-estimated improvement and were successively
-uprated; after period life expectancy at birth ($e_0$) stalled around 2010 they
-began to *over*-estimate improvement and were successively downrated. This paper
-sets out a transparent, rapidly-updatable monitoring index for the post-2010
-slowdown, applies it to the extended $e_0$ series to 2024, and compares the
-pre-pandemic estimate descriptively against the 2020–2024 outturn.
+**Background.** After decades of steady gains, UK period life expectancy at birth
+($e_0$) stalled around 2010. A recurring question — posed qualitatively by @hiam2023slowing
+in *Slowing down or returning to normal?* — is whether such a run of disappointing
+years reflects a genuine change in the underlying process of longevity improvement
+or a temporary excursion that will revert. Framed the way one frames extreme
+weather, the question is quantitative: if a "1-in-1000-year storm" recurs within a
+lifetime, how many such years does it take before one should conclude the climate,
+not the weather, has changed?
 
-**Objective.** To quantify how far UK $e_0$ improvement has fallen below its
-1991–2010 trend, to state what formal significance the data support, and to
-reassess how optimistic successive ONS rounds have been.
+**Objective.** To answer that **detection** question for UK longevity: how many
+years of stalled improvement it takes to reject the hypothesis that the long-run
+data-generating process (DGP) for annual $e_0$ change is unchanged, and how early
+a monitor committed in advance to this test would have fired. This is offered as
+the formal, quantitative complement to @hiam2023slowing.
 
-**Methods.** Period $e_0$ was taken from the Human Mortality Database (HMD) for
-international comparison and from the ONS for UK nations. The monitoring index is
-a two-sample comparison of the mean annual $e_0$ change in a post-2010
-observation window against the 1991–2010 calibration mean: the maximising
-slowdown proportion equals the ratio of these two means. We report the point
-slowdown, and a likelihood-ratio test of "some slowdown" against "no slowdown"
-(Normal likelihood, calibration variance treated as known). An earlier version
-framed the same quantity as a Bayes factor; it is more precisely a profile
-likelihood ratio, and the likelihood engine was separately corrected for an
-operator-precedence bug (see @sec-methods and the audit appendix). Window
-sensitivity is reported transparently.
+**Methods.** Annual $e_0$ change 1991–2010 (UK nations, ONS; comparators, Human
+Mortality Database) calibrates a null DGP, Normal($\mu_0,\sigma_0^2$). Three
+detection tools are derived in closed form: (i) the surprise of a single "bad"
+($\le 0$) year under the null; (ii) a power calculation for the number of years a
+sustained lower regime must persist before a likelihood-ratio (LR) test rejects
+"DGP unchanged"; and (iii) a retrospective early-warning walk that reports the
+first year the accumulated evidence would have fired. The LR estimate of the
+slowdown's magnitude (a transparent two-sample mean comparison, earlier
+mislabelled a Bayes factor and separately corrected for an operator-precedence
+bug) is retained as a secondary summary.
 
 **Results.** A breakpoint near 2010 is confirmed for the UK and all constituent
-nations except Northern Ireland. Depending on where the observation window ends,
-the UK point slowdown is about `r hl_f`–`r repro_f`% (females) and
-`r hl_m`–`r repro_m`% (males) of the earlier improvement rate; the 2011–2018
-window reproduces the original paper's ~61%/61% exactly, and the strong 2019
-recovery year lowers it. The point slowdown is real and sizeable, but formal
-significance is reached for only `r n_sig` of 10 population–sex cells — UK and
-England **males** (LR $p$ = `r f3(lr_get("United Kingdom","male", p_value))` and
-`r f3(lr_get("England","male", p_value))`); every female cell and Northern
-Ireland are consistent with a slowdown but not individually significant given
-their noise. Because England is a large deterministic component of the UK, those
-two significant cells are effectively **one** independent signal (annual-change
-correlation ≈ `r f3(cor_uk_eng_m)`), not a cross-population pattern.
-Descriptively, the 2020 pandemic shock lies far outside the model, and 2022–2024
-improvement overshot the pre-2020 implied rate by about
-`r f2(oos_overshoot("male"))`× before the shock and rebound partly cancel over
-2020–2024. The newest ONS rounds (2020-, 2022-, 2024-based) sit close to the
-pre-pandemic benchmark rather than far below it.
+nations except Northern Ireland. For **males** the signal-to-noise is high enough
+that a single non-improving year is already a 1-in-`r round(storm_get("United Kingdom","male","odds_1_in"))`
+event under the null, the observed `r bad_get("United Kingdom","male","n_bad")`-of-`r bad_get("United Kingdom","male","n_post")`
+bad years post-2010 (expected `r f2(bad_get("United Kingdom","male","exp_bad"))`) a
+~1-in-`r round(bad_get("United Kingdom","male","odds_ge")/50)*50` surprise, and the
+monitor would have fired on trend alone in **`r detect_get("United Kingdom","male")`** —
+five years of data, pre-dating the original 2019 analysis. For **females** the same
+series is far noisier: a bad year is only a 1-in-`r round(storm_get("United Kingdom","female","odds_1_in"))`
+event, the pre-COVID trend never reaches $p<0.05$, and the apparent 2020 firing is
+the pandemic shock, not the trend. Detection time scales as $1/(1-k)^2$ in the
+retained fraction $k$ of the old rate: a full stall is detectable in
+`r ytd_get("United Kingdom","male",0,"iid")`–`r ytd_get("United Kingdom","female",0,"iid")`
+years (UK male/female), a half-slowdown in
+`r ytd_get("United Kingdom","male",0.5,"iid")`–`r ytd_get("United Kingdom","female",0.5,"iid")`,
+a quarter-slowdown in `r ytd_get("United Kingdom","male",0.75,"iid")`–`r ytd_get("United Kingdom","female",0.75,"iid")`.
+Negative year-to-year autocorrelation ($\rho\approx$ `r f2(acf1_f)`) roughly halves
+these. On refreshed current-vintage HMD data over a common 2011–2019 window the UK
+ranks **`r uk_rank_m`th slowest of `r intl_n`** high-income countries for both sexes.
 
-**Conclusion.** The stalling in UK $e_0$ improvement after 2010 was real and
-roughly halved the earlier rate, but the evidence for it as a distinct
-statistical signal rests on essentially one male series, and the partial
-post-2020 recovery weakens any "stalling has only worsened" narrative. The value
-of the index is transparency and timeliness between biennial ONS releases, not a
-novel inferential apparatus.
+**Conclusion.** The post-2010 stall was, for the high-signal male series,
+detectable within a handful of years and well before it entered policy debate;
+for the noisier female series and for mild slowdowns generally, detection requires
+one to several decades of data. The framework quantifies exactly how much evidence
+the "slowing down or returning to normal?" question requires — and shows the answer
+depends sharply on severity and signal-to-noise.
 
 # Introduction
 
@@ -339,42 +444,61 @@ UK-government austerity policies and corresponding changes in the funding and
 provision of out-of-work benefits and social and healthcare services; analyses
 by others have instead emphasised the multifactorial nature of the slowdown and
 the roles of influenza and slowing cardiovascular-disease improvement in
-particular [@murphy2019stalling].
+particular [@murphy2019stalling]. In a direct precursor to the present work,
+@hiam2023slowing compared British life-expectancy improvement against five large
+European countries before the pandemic and established that Britain had become an
+international outlier, posing the pointed question in their title — *slowing down
+or returning to normal?* Their treatment of that question is qualitative and
+comparative. The present paper is its **quantitative complement**: it asks how
+much evidence it takes to decide.
 
-This paper focuses on how ONS mortality projections have changed over this period
-of stalling UK life expectancy, and on how new annual data can be better used to
-inform assumptions about future trajectories. We set out a simple, transparent
-**monitoring index** for how substantial the post-2010 stalling has been: a
-two-sample comparison of the mean annual $e_0$ change since 2010 against the
-1991–2010 mean, accompanied by a likelihood-ratio test of whether the slowdown is
-distinguishable from noise. The index can be recomputed within minutes of each
-annual ONS release, so that a transparent interim summary of the underlying
-improvement rate can be produced in the years between the biennial ONS releases.
-Its contribution is timeliness and audit-grade reproducibility, not a novel
-estimator: as we show in @sec-methods, the index reduces to a rescaled mean
-comparison.
+**The detection question.** Underlying "slowing down or returning to normal?" is a
+problem of statistical detection, and it is best framed the way extreme events are
+framed in climatology. A "1-in-1000-year storm" is defined by a stationary
+data-generating process (DGP); if such storms begin recurring within a single
+lifetime, one should suspect the DGP itself has changed, but a single extreme year
+is never enough to conclude this. The same logic applies to longevity: annual $e_0$
+improvement has a long-run mean and variance, occasional bad years are expected,
+and the question is not whether any single year is bad but **how many anomalous
+years it takes to reject the hypothesis that the long-run DGP for longevity
+improvement is unchanged.** This is a detection problem — a power/sample-size
+question — and it is what this paper sets out to answer. We calibrate the null DGP
+on annual $e_0$ changes 1991–2010 and derive, in closed form, (i) how surprising a
+single bad year is; (ii) how many years of a sustained lower regime it takes before
+a monitor rejects "DGP unchanged"; and (iii), retrospectively, the first year at
+which a monitor committed in advance to this test would actually have fired.
+
+We deliberately do **not** claim the underlying summary — mean annual $e_0$ change,
+its trend, or a standardised rate — as a novel "monitoring index": period $e_0$,
+$\mathrm{d}e_0/\mathrm{d}t$ and standardised mortality rates are themselves already
+monitoring indices, so that framing carries no distinctive contribution. The
+distinctive, decision-relevant question is the detection one above. We retain a
+likelihood-ratio estimate of the slowdown's *magnitude* (@sec-bf) as a secondary
+summary of what the accumulated evidence says once a change has been detected, but
+the detection framework (@sec-detect) is the centrepiece.
 
 This is a **substantially revised analysis**. Relative to the original
 2019-vintage draft it (i) extends the observed $e_0$ series from 2018 to 2024;
 (ii) corrects an operator-precedence error in the likelihood engine (see
-@sec-methods and the audit appendix); and (iii) recasts the estimator honestly as
-a monitoring index — a profile likelihood ratio and its associated LR test —
-rather than the "Bayes factor" of earlier drafts, and reports what formal
-significance the data actually support. Two findings the extended data force upon
-us shape the presentation: the point slowdown is sensitive to whether the
-observation window ends in 2018 or 2019, and the 2020 pandemic year is not an
-ordinary draw from the pre-pandemic process, so we compare (not validate) the
-pre-pandemic estimate against 2020–2024 descriptively.
+@sec-methods and the audit appendix); (iii) recasts the earlier "Bayes factor" of
+the magnitude estimate honestly as a profile likelihood ratio and its associated LR
+test; and (iv) reorients the contribution from a point estimate of *how big* the
+slowdown is to a detection framework for *how much evidence* it takes to conclude
+the process has changed. Two findings the extended data force upon us shape the
+presentation: the magnitude estimate is sensitive to whether the observation window
+ends in 2018 or 2019, and the 2020 pandemic year is not an ordinary draw from the
+pre-pandemic process, so we treat the pandemic years carefully throughout.
 
 The rest of the paper proceeds as follows. We first place the UK slowdown in
-international context (@sec-intl). We then examine UK-nation $e_0$ trends and
-locate the breakpoint (@sec-uk). We present five decades of ONS projections
-against observed $e_0$ (@sec-projns). We then give the monitoring-index estimate
-of the slowdown with its significance test and transparent window sensitivity
-(@sec-bf), compare the pre-pandemic estimate against 2020–2024 as a persistence
-check (@sec-oos), and set the estimate against every ONS round from 2012 to 2024
-(@sec-bfons). A discussion (@sec-discussion) synthesises and sets out
-limitations.
+international context on refreshed data (@sec-intl). We then examine UK-nation $e_0$
+trends and locate the breakpoint (@sec-uk). We then give the paper's centrepiece —
+the detection framework: storm surprise, years-to-detect power curves, and
+retrospective early warning (@sec-detect). We present five decades of ONS
+projections against observed $e_0$ (@sec-projns), report the likelihood-ratio
+estimate of the slowdown's magnitude with transparent window sensitivity (@sec-bf),
+compare the pre-pandemic estimate against 2020–2024 as a persistence check
+(@sec-oos), and set the estimate against every ONS round from 2012 to 2024
+(@sec-bfons). A discussion (@sec-discussion) synthesises and sets out limitations.
 
 # Methods {#sec-methods}
 
@@ -474,49 +598,76 @@ is a persistence check, not a test of forecast skill. For transparency we also
 report a full series (2011–2024) and a COVID-excluded series (2011–2024 dropping
 2020–2021), and do not privilege any single number without stating the others.
 
+**Detection framework.** The paper's centrepiece treats the slowdown as a problem
+of detecting a change in the DGP, calibrated on the same 1991–2010 annual changes
+(null: Normal($\mu_0,\sigma_0^2$)). Three closed-form tools are used (implemented in
+`R/detection.R`):
+
+- *Storm surprise.* The probability that a single year's change falls at or below a
+  threshold (default $0$, i.e. no improvement) under the null is
+  $p=\Phi\!\big((\,\text{threshold}-\mu_0)/\sigma_0\big)$; its reciprocal is the
+  "1-in-$N$" odds of such a year. The number of independent such years whose joint
+  probability first falls below $1/1000$ makes the storm analogy concrete.
+- *Years to detect.* Under a sustained alternative in which the true mean is
+  $k\mu_0$ (with $k$ the retained fraction of the old rate; $k=0$ a complete stall)
+  and $\sigma_0$ unchanged, the mean of $n$ annual changes has one-sided
+  $z=(k-1)\mu_0\sqrt{n}/\sigma_0$; solving for rejection at level $\alpha$ gives
+  $n=\big(z_{1-\alpha}\,\sigma_0/((1-k)\mu_0)\big)^2$, so detection time scales as
+  $1/(1-k)^2$ in severity and as $(\sigma_0/\mu_0)^2$ in the calibration
+  noise-to-signal ratio. Because annual $e_0$ changes are negatively autocorrelated
+  (below), we also report an AR(1) effective-sample-size correction
+  $n_\text{eff}=n(1-\rho)/(1+\rho)$: negative $\rho$ *reduces* the variance of a
+  multi-year mean and so *speeds* detection.
+- *Retrospective early warning.* Walking forward from the change point, we compute
+  the LR test of "DGP unchanged" over the accumulating window and report the first
+  year at which $p<0.05$ — how early a monitor committed in advance to this test
+  would have fired.
+
 # Results 1: International context {#sec-intl}
 
-Slowdowns in $e_0$ gain have been observed in a number of high-income nations in
-recent years. On the (stale, ragged) HMD vintage used here the UK sits among the
-slowest-improving high-income nations, alongside the USA, Iceland, the
-Netherlands and Germany, but this comparison should be read with caution: the HMD
-extract underlying @fig-intl ends around 2016 for most named comparators (and
-2013–14 for some), whereas the UK series elsewhere in this paper runs to 2024, so
-the "2010s" ordering is a truncated, country-specific window. We therefore do not
-make a firm claim about the UK's *relative* severity here; refreshing the
-comparison to a current common HMD vintage is flagged below and is being
-undertaken separately. @fig-intl arranges HMD nations by their average annual
-improvement in the 2010s. The nations with the fastest recent improvement are
-Russia and Eastern European countries (e.g. Belarus, Ukraine, Russia, Lithuania,
-Poland), while the slowest gains are seen in the USA, Iceland, the UK, the
-Netherlands and Germany. In general, nations with the worst changes in the 1980s
-and 1990s have tended to see the fastest improvement in the 2010s, and vice
-versa. Notably, average improvement rates in Germany and the UK in the 2010s are
-within about 0.01 years/year of one another.
+That Britain is an international outlier in longevity improvement is the finding
+@hiam2023slowing established against five large European countries; here we place
+the UK against a wider set of high-income nations on a **refreshed, current-vintage**
+HMD extract (`data/e0_hmd_2024vintage.csv`) over a **common 2011–2019 window** —
+the pre-pandemic decade on which all `r intl_n` comparators have complete data.
+This replaces the stale, ragged pre-2017 vintage used in earlier drafts, whose
+country-specific endpoints (2013–2016 for many comparators) made any relative
+ranking unsafe to quote. A few countries whose HMD series remain stale at source
+(notably Israel, Russia and Ukraine) are excluded from the common-window ranking.
+On this refreshed basis the relative-severity claim holds on current data:
+@tbl-intl-rank ranks the `r intl_n` nations by mean annual $e_0$ gain 2011–2019.
+
+```{r}
+#| label: tbl-intl-rank
+#| tbl-cap: "Mean annual change in period life expectancy at birth (years/year), 2011-2019 common window, by sex, for 20 high-income nations. Ranked slowest-improving first. Source: Human Mortality Database (current 2024 vintage). Israel, Russia and Ukraine are excluded as their HMD series remain stale at source."
+intl_rank %>%
+  select(Country, sex, mean_gain, rank) %>%
+  pivot_wider(names_from = sex, values_from = c(mean_gain, rank)) %>%
+  arrange(rank_male) %>%
+  transmute(Country,
+            `Male gain` = round(mean_gain_male, 3), `Male rank` = rank_male,
+            `Female gain` = round(mean_gain_female, 3), `Female rank` = rank_female) %>%
+  kbl() %>% kable_styling(full_width = FALSE) %>%
+  add_header_above(c(" " = 1, "Male" = 2, "Female" = 2))
+```
+
+The UK ranks **`r uk_rank_m`th slowest of `r intl_n`** for males and
+**`r uk_rank_f`th slowest of `r intl_n`** for females over 2011–2019. For males the
+only nations improving more slowly than the UK are `r knitr::combine_words(intl_slower("male"))`;
+for females they are `r knitr::combine_words(intl_slower("female"))`. The original
+draft's characterisation of the UK as "more severe than all except the USA" is
+therefore slightly too strong on current data, but the substantive claim — that the
+UK sits among the very slowest-improving high-income nations, an international
+outlier in the sense of @hiam2023slowing — is confirmed on the refreshed vintage.
+The broader decade pattern, in which nations with the worst changes in the 1980s
+and 1990s have tended to see the fastest improvement in the 2010s and vice versa,
+is illustrated for context in @fig-intl.
 
 ```{r}
 #| label: fig-intl
-#| fig-cap: "Average annual change in period life expectancy at birth by decade across HMD high-income nations, arranged by average gain in the 2010s. Source: Human Mortality Database. (Figure regenerated in the 2026 refactor; see analysis/01_international_trends.qmd.)"
+#| fig-cap: "Average annual change in period life expectancy at birth by decade across HMD high-income nations, arranged by average gain in the 2010s. Shown for qualitative decade-pattern context only; the current-vintage relative ranking is given in @tbl-intl-rank. Source: Human Mortality Database."
 knitr::include_graphics(rp("bayes_paper", "figures", "A01_intl_mean_ch_e0_by_decade.png"))
 ```
-
-A closer comparison of the slowest-improving high-income nations (the USA, the
-UK, the Netherlands and Germany) is shown in @fig-intl-selected.
-
-```{r}
-#| label: fig-intl-selected
-#| fig-cap: "Annual change in period life expectancy at birth for selected slow-improving high-income nations. Source: Human Mortality Database."
-knitr::include_graphics(rp("bayes_paper", "figures", "A02_selected_high_income.png"))
-```
-
-[TODO: the international comparison uses a pre-2017 HMD vintage
-(`data/e0_hmd.csv`, ending ~2016 for most named comparators) and is being
-refreshed to a current common vintage via the download pipeline in the sibling
-`hmd-population-discrepancies` repo (blocked only on refreshing HMD session
-credentials). Until then this section is illustrative, not current, and the
-relative-severity ordering should not be quoted. The full 38-nation decade table
-(original Table R1.1) is likewise deferred to the refreshed vintage rather than
-copying the original draft's truncated values.]
 
 # Results 2: UK trends and the breakpoint {#sec-uk}
 
@@ -576,7 +727,142 @@ consistent with previously published research on the UK stalling
 knitr::include_graphics(rp("bayes_paper", "figures", "A10_brk_uk_nations.png"))
 ```
 
-# Results 3: ONS projections against observed $e_0$ {#sec-projns}
+# Results 3: Detecting a change in the DGP {#sec-detect}
+
+This is the paper's centrepiece. Rather than ask only *how big* the post-2010
+slowdown is (@sec-bf), we ask the decision-relevant question underlying "slowing
+down or returning to normal?" [@hiam2023slowing]: **how much evidence does it take
+to conclude that the long-run process generating annual $e_0$ improvement has
+changed?** We calibrate the null DGP on the 1991–2010 annual changes and answer
+this in three ways — how surprising a single bad year is, how many years of a
+sustained lower regime it takes to detect the change, and how early a monitor
+would in fact have fired.
+
+## How surprising is a single bad year? {#sec-storm}
+
+Under the calibrated null, a UK **male** year of zero-or-negative $e_0$ change is a
+1-in-`r round(storm_get("United Kingdom","male","odds_1_in"))` event
+($p=`r f3(storm_get("United Kingdom","male","p_year"))`$): male improvement was fast
+(`r f3(uk_calib_m)` years/year) relative to its year-to-year noise, so a bad year is
+genuinely anomalous, and just `r storm_get("United Kingdom","male","years_iid_to_1_in_1000")`
+independent such years would be a 1-in-1000 coincidence. A UK **female** bad year is
+by contrast a 1-in-`r round(storm_get("United Kingdom","female","odds_1_in"))` event
+($p=`r f3(storm_get("United Kingdom","female","p_year"))`$) — unremarkable — because
+female improvement was slower and noisier.
+
+What actually happened post-2010 sharpens the contrast. The UK saw
+`r bad_get("United Kingdom","male","n_bad")` male bad years in the
+`r bad_get("United Kingdom","male","n_post")` years 2011–2024, against an expectation
+under the null of just `r f2(bad_get("United Kingdom","male","exp_bad"))`; the
+probability of `r bad_get("United Kingdom","male","n_bad")` or more is
+`r f3(bad_get("United Kingdom","male","p_ge"))`, a **~1-in-`r round(bad_get("United Kingdom","male","odds_ge")/50)*50`
+surprise**. The UK female series also saw `r bad_get("United Kingdom","female","n_bad")`
+bad years, but against an expectation of `r f2(bad_get("United Kingdom","female","exp_bad"))`
+this is a ~1-in-`r round(bad_get("United Kingdom","female","odds_ge"))` event —
+essentially unsurprising. The male excess of bad years is the storm that recurred
+too often to be weather; the female record, on its own, is not.
+
+## How many years to detect a sustained slowdown? {#sec-power}
+
+If the true improvement rate drops to a fraction $k$ of its old value and stays
+there, how long must the new regime persist before a monitor can reject "DGP
+unchanged" at $p<0.05$? Detection time scales as $1/(1-k)^2$ in severity and as the
+squared calibration noise-to-signal ratio $(\sigma_0/\mu_0)^2$, so it depends
+sharply on both how severe the slowdown is and how clean the series is.
+@tbl-detect-power gives the answer for every population and sex, under both the
+i.i.d. null and an AR(1) correction (below); @fig-detect plots the UK curves.
+
+```{r}
+#| label: tbl-detect-power
+#| tbl-cap: "Years of a sustained lower regime needed to reject 'DGP unchanged' at p<0.05, by population, sex and severity. k is the retained fraction of the 1991-2010 mean rate (k=0 full stall, k=0.5 half-slowdown, k=0.75 quarter-slowdown). 'iid' assumes independent annual changes; 'AR(1)' applies the effective-sample-size correction for lag-1 autocorrelation rho=-0.5, which speeds detection."
+ytd_tbl %>%
+  mutate(sev = recode(as.character(k), `0` = "Full stall (k=0)",
+                      `0.5` = "Half (k=0.5)", `0.75` = "Quarter (k=0.75)"),
+         cell = paste0(iid, " (", ar1, ")")) %>%
+  select(Population = population, Sex = sex, sev, cell) %>%
+  pivot_wider(names_from = sev, values_from = cell) %>%
+  select(Population, Sex, `Full stall (k=0)`, `Half (k=0.5)`, `Quarter (k=0.75)`) %>%
+  arrange(Population, Sex) %>%
+  kbl() %>% kable_styling(full_width = FALSE) %>%
+  add_header_above(c(" " = 2, "Years to detect: iid (AR(1))" = 3))
+```
+
+```{r}
+#| label: fig-detect
+#| fig-cap: "Years of a sustained slowdown needed to detect it (p<0.05) against its severity, UK, by sex and noise model. A full stall is detectable almost immediately; a mild (quarter) slowdown needs decades. Negative autocorrelation (AR(1), rho=-0.5) roughly halves detection time. y-axis on a log scale."
+knitr::include_graphics(rp("figures", "A15_detection_power_2024.png"))
+```
+
+The dependence on severity is stark. A **full stall** ($k=0$) in UK improvement
+would be detectable in `r ytd_get("United Kingdom","male",0,"iid")` year (males) or
+`r ytd_get("United Kingdom","female",0,"iid")` years (females). A **half-slowdown**
+($k=0.5$, close to the observed magnitude) needs
+`r ytd_get("United Kingdom","male",0.5,"iid")` years (males) but
+`r ytd_get("United Kingdom","female",0.5,"iid")` (females). A mild **quarter-slowdown**
+($k=0.75$) needs `r ytd_get("United Kingdom","male",0.75,"iid")` years for males and
+fully `r ytd_get("United Kingdom","female",0.75,"iid")` years for females — longer
+than a working lifetime. The sex gap is entirely a signal-to-noise effect: the male
+calibration ratio $\mu_0/\sigma_0$ is far more favourable than the female one, and
+detection time depends on its square.
+
+**Negative autocorrelation speeds detection.** Annual $e_0$ changes are negatively
+autocorrelated (UK lag-1 $\rho\approx$ `r f2(acf1_f)` for females,
+`r f2(acf1_m)` for males over 1991–2019): a good year tends to follow a bad one, so
+the variance of a multi-year mean is *smaller* than under independence. Applying the
+AR(1) effective-sample-size correction with $\rho=-0.5$ roughly halves the years to
+detect — the UK female half-slowdown falls from
+`r ytd_get("United Kingdom","female",0.5,"iid")` to
+`r ytd_get("United Kingdom","female",0.5,"ar1")` years (@tbl-detect-power, figures in
+parentheses). This is the same negative autocorrelation that @white2002longevity
+invoked to justify simple linear extrapolation of $e_0$; here it works in the
+analyst's favour, making regime change easier to detect. The i.i.d. figures are thus
+*conservative*.
+
+## How early would the monitor have fired? {#sec-earlywarning}
+
+The power calculation above is prospective. Retrospectively, we can walk a monitor
+forward from 2011 and ask when the accumulated evidence first crossed $p<0.05$.
+@tbl-first-fire gives the first firing year for each population and sex; @fig-early
+plots the UK $p$-value trajectories.
+
+```{r}
+#| label: tbl-first-fire
+#| tbl-cap: "First year at which a likelihood-ratio monitor accumulating annual e0 changes from 2011 rejects 'DGP unchanged' at p<0.05 (calibration 1991-2010). 'never' = p>=0.05 throughout to 2024. The female firings all occur in 2020 and are driven by the pandemic shock, not the pre-2020 trend (see text)."
+detect_tbl %>%
+  transmute(Population = population, Sex = sex,
+            `First fires` = ifelse(is.na(first_year), "never", as.character(first_year))) %>%
+  arrange(Population, Sex) %>%
+  kbl() %>% kable_styling(full_width = FALSE)
+```
+
+```{r}
+#| label: fig-early
+#| fig-cap: "Retrospective early warning: likelihood-ratio test p-value against the last year of accumulated evidence, UK, by sex (monitor started 2011; log scale). Males cross p<0.05 in 2015 on the pre-pandemic trend; females only in 2020, when the pandemic shock -- not the trend -- drives the crossing. Dashed line p=0.05; shaded band the COVID years."
+knitr::include_graphics(rp("figures", "A16_early_warning_2024.png"))
+```
+
+For **males**, the monitor fires in **`r detect_get("United Kingdom","male")`** for
+both the UK and England — using only the five years 2011–2015, and *four years before*
+the original 2019-vintage analysis was drafted. The UK-male $p$-value falls
+monotonically thereafter: `r f3(ukm_p(2015))` in 2015, `r f3(ukm_p(2016))` (2016),
+`r f3(ukm_p(2017))` (2017), `r f3(ukm_p(2018))` (2018), and effectively zero once the
+pandemic years enter. The premise that a slowdown could be caught from *a handful of
+observations* is vindicated — but only for the high-signal male series.
+
+**An honesty note on the female firings.** Every female cell also "fires", but all
+in **2020** (@tbl-first-fire), and this is an artefact of the pandemic, not evidence
+that the trend-based slowdown was detectable. The pre-COVID female trajectory never
+reaches $p<0.05$ (the smallest UK-female accumulated $p$ over 2011–2019 is
+`r f2(ukf_min_pre2020)`); it is the huge 2020 fall — outside anything the null contemplates
+— that pushes the accumulated female $p$ below the threshold. So the honest reading is
+asymmetric: **the trend-based slowdown was detectable early for males (2015, five
+years of data) but not for females**, whose slower, noisier improvement never
+generated a trend signal before the pandemic contaminated the series. Scotland and
+Wales males likewise fire only in 2020, Northern Ireland males not until 2024, and
+Northern Ireland females never — the same male-over-female, high-signal-first ordering
+that the detection power calculation predicts, reached here by an independent route.
+
+# Results 4: ONS projections against observed $e_0$ {#sec-projns}
 
 @fig-fan shows ONS $e_0$ projection rounds from 1971 to 2024 against observed
 $e_0$ (black). The picture is a three-act story of forecast error: successive
@@ -617,14 +903,19 @@ uk_cmp %>%
   kbl() %>% kable_styling(full_width = FALSE)
 ```
 
-# Results 4: Monitoring-index estimate of the slowdown {#sec-bf}
+# Results 5: What the accumulated evidence says about the magnitude {#sec-bf}
 
-This section quantifies how far post-2010 UK improvement has fallen short of the
-1991–2010 trend, using the monitoring index of @sec-methods: the ratio of the
-observation-window mean annual $e_0$ change to the calibration mean, with a
-likelihood-ratio test of whether that shortfall is distinguishable from noise.
-@fig-bf-schedules shows the profile-likelihood-ratio schedules for the
-pre-pandemic window; the point slowdown is where each curve peaks.
+Having established *how much evidence* it takes to detect a change (@sec-detect), we
+turn to the secondary question of *how large* the change is once detected. This is a
+transparent two-sample comparison of the observation-window mean annual $e_0$ change
+against the 1991–2010 calibration mean (the "slowdown %"), with a likelihood-ratio
+test of whether the shortfall is distinguishable from noise — the same LR machinery
+that drives the early-warning monitor, read here for magnitude rather than timing. We
+present it deliberately as a subsidiary summary, not the contribution: as noted in
+@sec-methods the estimator reduces to a rescaled mean ratio, and earlier drafts
+overreached in labelling it a "Bayes factor". @fig-bf-schedules shows the
+profile-likelihood-ratio schedules for the pre-pandemic window; the point slowdown is
+where each curve peaks.
 
 ```{r}
 #| label: fig-bf-schedules
@@ -727,7 +1018,7 @@ either: it is pulled *up* by the genuine 2022–2024 recovery, which the origina
 the full set of windows, together with the descriptive 2020–2024 comparison
 (@sec-oos), is the most honest framing.
 
-# Results 5: Persistence comparison against 2020–2024 {#sec-oos}
+# Results 6: Persistence comparison against 2020–2024 {#sec-oos}
 
 It is tempting to treat the pre-pandemic (2011–2019) window as a forecast and the
 2020–2024 outturn as an out-of-sample validation of it. We resist that framing,
@@ -781,7 +1072,7 @@ rule *before* the data arrive; we flag this as the natural next step rather than
 claiming it here. The 2022–2024 rebound should also be read with the
 period-vs-cohort caveat of @sec-discussion in mind.
 
-# Results 6: Comparison with ONS assumptions {#sec-bfons}
+# Results 7: Comparison with ONS assumptions {#sec-bfons}
 
 Finally we set the pre-pandemic monitoring-index benchmark — the pre-2020 implied
 mean annual gain per population and sex — against the mean annual $e_0$
@@ -848,12 +1139,21 @@ with the pre-pandemic evidence rather than clearly more optimistic.
 
 # Discussion {#sec-discussion}
 
-This paper set out to quantify the post-2010 slowdown in UK life-expectancy
-improvement using a transparent, rapidly-updatable monitoring index, and — in a
-substantial revision of the original analysis — to compare a pre-pandemic
-estimate descriptively against the 2020–2024 outturn.
+This paper set out to answer a **detection** question: how many years of stalled
+improvement it takes to conclude that the long-run process generating UK longevity
+gains has changed. This is the quantitative complement to @hiam2023slowing, whose
+qualitative "slowing down or returning to normal?" poses the same question without
+resolving how much evidence a decision requires. The framework's central result is
+that the answer depends sharply on severity and signal-to-noise: a full stall is
+detectable almost immediately, a mild slowdown needs decades, and the clean male
+series would have flagged the post-2010 slowdown in **`r detect_get("United Kingdom","male")`** —
+on five years of data and well before the slowdown entered policy debate — whereas
+the noisier female series never generated a pre-pandemic trend signal at all.
+Negative autocorrelation in annual $e_0$ change works in the analyst's favour,
+roughly halving detection times.
 
-The central findings are threefold. First, the stalling around 2010 was real: a
+The central substantive findings are threefold. First, the stalling around 2010 was
+real: a
 breakpoint within a year of 2010 is confirmed for the UK and all constituent
 nations except Northern Ireland, and the pre-pandemic monitoring index puts the
 UK point slowdown at roughly `r hl_f`% (females) to `r repro_m`% (males) of the
@@ -890,15 +1190,22 @@ the single male cell described above. Any previously circulated numbers quoting
 superseded by the likelihood-ratio $p$-values reported here and by the audit
 appendix.
 
-**Value of the index.** The monitoring index can be recomputed within minutes of
-each annual ONS release, providing a transparent interim estimate of the
-underlying improvement rate in the years between the biennial NPP rounds. Its
-contribution is timeliness and audit-grade reproducibility, not a novel
-estimator — it is, transparently, a two-sample comparison of means. A commitment
-to publish an updated index on each release — made *before* the data are seen —
-would turn the descriptive comparison of @sec-oos into a genuinely prospective
-test, and would give researchers and policymakers a shared "ground truth" around
-which to reason even where they disagree about causes.
+**Value of the framework.** The contribution is not the summary statistic — period
+$e_0$, its trend and standardised mortality rates are already monitoring indices —
+but the detection apparatus wrapped around it: a pre-committed answer to *how much
+evidence a change requires* and *how early it can be caught*. Its practical value is
+early warning between the biennial ONS rounds. A monitor committed in advance to the
+LR test would have flagged the male slowdown in
+`r detect_get("United Kingdom","male")`, four years before the original analysis and
+several NPP rounds before the assumptions had fully adjusted; the power curves
+(@sec-power) tell a decision-maker, prospectively, how many further years of
+disappointing data would be needed to reach the same confidence for a slowdown of
+any given severity. Committing publicly to the test and its threshold *before* each
+release — turning the retrospective walk of @sec-earlywarning into a genuinely
+prospective monitor — would give researchers and policymakers a shared, auditable
+"ground truth" around which to reason even where they disagree about causes, and
+would sharpen "slowing down or returning to normal?" [@hiam2023slowing] into a
+question with a pre-agreed answer.
 
 **Limitations.** Several caveats bound the conclusions. (i) The Normal-iid
 likelihood treats every annual change as an exchangeable draw, which the 2020
@@ -931,9 +1238,19 @@ estimates in particular should be treated with caution. (v) The final actual
 point (2024) is the NPP projection base year and is part-estimated. (vi) The
 calibration and comparison rest on a single pre-slowdown window (1991–2010); the
 qualitative picture is robust, but the exact percentages depend on that choice.
-(vii) The international comparison (@sec-intl) rests on a pre-2017 HMD vintage on
-a ragged window and is not current; the relative-severity ordering should not be
-quoted until it is refreshed.
+(vii) The international comparison (@sec-intl) has been refreshed to a current HMD
+vintage on a common 2011–2019 window, on which the UK's relative-severity ranking
+(4th slowest of `r intl_n`) holds; the residual caveats are that a handful of
+countries whose HMD series remain stale at source (Israel, Russia, Ukraine) are
+excluded, and that the ranking is specific to the pre-pandemic window chosen for
+common coverage. (viii) **Detection power is a strong function of severity and
+signal-to-noise.** The framework catches a full stall almost at once but needs one
+to several decades to catch a mild (quarter) slowdown, and its power is poor for the
+noisier female series and for the smaller UK nations regardless of the true effect;
+a real but gradual erosion of improvement could therefore persist for many years
+below the detection threshold. The method answers "how much evidence do we have?"
+honestly, which sometimes means "not yet enough" — an absence of firing is not
+evidence of no change.
 
 **Policy reading.** The original work concluded that the most recent ONS forecast
 still appeared too optimistic and underestimated the UK slowdown. The extended,
@@ -942,9 +1259,11 @@ the earlier improvement rate, but the formal evidence for it as a distinct
 statistical signal rests on essentially one male series, and the post-pandemic
 recovery together with the stabilisation of the newest ONS rounds mean that, for
 the latest vintages, the ONS assumptions are broadly consistent with the
-pre-pandemic evidence rather than clearly too optimistic. We make no firm claim
-here about the UK's severity *relative* to other high-income nations, which the
-repo's current (stale) international data cannot support. Whether the modest
+pre-pandemic evidence rather than clearly too optimistic. On refreshed current-vintage
+HMD data the UK remains among the very slowest-improving high-income nations
+(4th slowest of `r intl_n` over 2011–2019 for both sexes), confirming on current
+data the international-outlier status that @hiam2023slowing established qualitatively.
+Whether the modest
 2022–2024 recovery reflects genuine underlying improvement rather than a period
 harvesting rebound — and whether the drivers of the post-2010 stall have been
 addressed — remains open, and is exactly the kind of question the
