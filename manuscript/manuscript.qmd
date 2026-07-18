@@ -1,6 +1,6 @@
 ---
 title: "Running to a standstill"
-subtitle: "A pre-pandemic Bayes-factor estimate of the UK life-expectancy slowdown, validated out-of-sample against 2020–2024"
+subtitle: "A transparent monitoring index for the post-2010 UK life-expectancy slowdown"
 author: "Jon Minton"
 date: today
 bibliography: ../references.bib
@@ -37,9 +37,12 @@ find_root <- function(start = getwd()) {
 ROOT <- find_root()
 rp <- function(...) file.path(ROOT, ...)
 
-# Corrected likelihood engine (dnorm-based get_ll and calc_bayes_factors).
-# See R/bayes_factors.R and the audit appendix audit/get_ll_fix_impact.qmd.
+# Corrected likelihood engine (dnorm-based get_ll and calc_bayes_factors) and
+# the honest monitoring-index engine (slowdown_index: two-sample mean
+# comparison + likelihood-ratio test). See R/bayes_factors.R,
+# R/monitoring_index.R and the audit appendix audit/get_ll_fix_impact.qmd.
 source(rp("R", "bayes_factors.R"))
+source(rp("R", "monitoring_index.R"))
 
 populations <- c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")
 
@@ -134,15 +137,37 @@ repro_1118 <-
 repro_f <- repro_1118 %>% filter(sex == "female") %>% pull(slowdown_pct)
 repro_m <- repro_1118 %>% filter(sex == "male")   %>% pull(slowdown_pct)
 
-# Corrected maximised BF magnitudes for the 2011-2018 audit window.
-bf18 <-
+# --- Monitoring-index likelihood-ratio test --------------------------------
+# Primary inferential summary. slowdown_index() reports the two-sample mean
+# comparison (rate_ratio, slowdown_pct), the LR test of "some slowdown" vs
+# "no slowdown" (lr_stat, p_value), and the profile likelihood ratio (plr,
+# the quantity earlier mislabelled a Bayes factor). The 2011-2018 window
+# reproduces the original paper's headline exactly and is the primary
+# inferential table; the pre-2020 (2011-2019) window is reported alongside to
+# show the significance pattern is unchanged by adding 2019.
+lr_index <- function(win) {
   ch_e0_dta %>%
-  group_by(population, sex) %>% nest() %>%
-  mutate(bf = map(data, ~calc_bayes_factors(.x, c(1991, 2010), c(2011, 2018), ch_e0))) %>%
-  select(population, sex, bf) %>% unnest(bf) %>%
-  group_by(population, sex) %>% slice_max(log_bf, n = 1, with_ties = FALSE) %>% ungroup() %>%
-  transmute(population, sex, bf = bayes_factor)
-bf18_get <- function(pop, sx) bf18 %>% filter(population == pop, sex == sx) %>% pull(bf)
+    group_by(population, sex) %>% nest() %>%
+    mutate(si = map(data, ~slowdown_index(.x, c(1991, 2010), win, ch_e0))) %>%
+    select(population, sex, si) %>% unnest(si) %>% ungroup() %>%
+    mutate(population = factor(population, levels = populations)) %>%
+    arrange(population, sex)
+}
+lr_1118 <- lr_index(c(2011, 2018))
+lr_pre2020 <- lr_index(c(2011, 2019))
+
+lr_get <- function(pop, sx, col, tbl = lr_1118)
+  tbl %>% filter(population == pop, sex == sx) %>% pull({{ col }})
+n_sig <- sum(lr_1118$p_value < 0.05)
+
+# Non-independence of the two significant male cells: England is a large
+# deterministic component of the UK aggregate, so the UK-male and England-male
+# annual-change series are almost perfectly correlated.
+uk_eng_m <- ch_e0_dta %>%
+  filter(sex == "male", population %in% c("United Kingdom", "England")) %>%
+  select(population, year, ch_e0) %>%
+  pivot_wider(names_from = population, values_from = ch_e0)
+cor_uk_eng_m <- cor(uk_eng_m$`United Kingdom`, uk_eng_m$England, use = "complete.obs")
 
 # Headline (Pre-2020) and other UK variant values.
 uk_arg <- bf_argmax %>% filter(population == "United Kingdom")
@@ -151,7 +176,7 @@ hl_f  <- uk_val("Pre-2020", "female"); hl_m  <- uk_val("Pre-2020", "male")
 full_f <- uk_val("Full series", "female"); full_m <- uk_val("Full series", "male")
 cov_f  <- uk_val("COVID-excluded", "female"); cov_m <- uk_val("COVID-excluded", "male")
 
-# --- Out-of-sample validation ----------------------------------------------
+# --- Persistence comparison against 2020-2024 (not a forecast validation) ---
 pre2020_implied <- bf_argmax %>% filter(variant == "Pre-2020") %>%
   select(population, sex, implied_annual = mu_best)
 
@@ -170,7 +195,14 @@ validation_table <- pre2020_implied %>%
 uk_oos <- validation_table %>% filter(population == "United Kingdom")
 oos_g <- function(sx, col) uk_oos %>% filter(sex == sx) %>% pull({{ col }})
 
-# --- Bayes factor benchmark vs ONS projection rounds ------------------------
+# Overshoot of the recovered rate relative to the pre-2020 implied gain. By the
+# monitoring-index identity the "pre-2020 implied gain" IS the 2011-2019 sample
+# mean, so this compares a recovery-period mean against a calibration mean, not
+# a genuine forecast against an outturn.
+oos_overshoot <- function(sx)
+  oos_g(sx, obs_mean_2022_24) / oos_g(sx, implied_annual)
+
+# --- Monitoring-index benchmark vs ONS projection rounds --------------------
 ons_projections_tidied <- read_rds(rp("data", "ons_projections", "all_tidied_2012_2024.rds"))
 
 bf_benchmark <- pre2020_implied %>%
@@ -210,46 +242,51 @@ life-expectancy projections every two years. Through the 2000s these
 projections repeatedly *under*-estimated improvement and were successively
 uprated; after period life expectancy at birth ($e_0$) stalled around 2010 they
 began to *over*-estimate improvement and were successively downrated. This paper
-introduces a continually-updatable Bayes-factor method for quantifying the
-post-2010 slowdown, estimates it on pre-pandemic data, and — in a substantial
-revision of the original 2019-vintage analysis — validates that estimate
-out-of-sample against the 2020–2024 outturn.
+sets out a transparent, rapidly-updatable monitoring index for the post-2010
+slowdown, applies it to the extended $e_0$ series to 2024, and compares the
+pre-pandemic estimate descriptively against the 2020–2024 outturn.
 
-**Objective.** To estimate how far UK $e_0$ improvement has fallen below its
-1991–2010 trend, to test whether a pre-pandemic estimate anticipates 2020–2024,
-and to reassess how optimistic successive ONS rounds have been.
+**Objective.** To quantify how far UK $e_0$ improvement has fallen below its
+1991–2010 trend, to state what formal significance the data support, and to
+reassess how optimistic successive ONS rounds have been.
 
 **Methods.** Period $e_0$ was taken from the Human Mortality Database (HMD) for
-international comparison and from the ONS for UK nations. For each population we
-compared the likelihood of the observed post-2010 annual $e_0$ changes under a
-family of proportional-slowdown scenarios (0–100% of the 1991–2010 mean gain)
-against a no-slowdown null, using Bayes factors [@kass1995bayes] computed from a
-Normal-iid likelihood. The likelihood engine was corrected for an
-operator-precedence error present in the original drafts (see audit). The
-headline estimate uses a pre-pandemic observation window (2011–2019); the
-2020–2024 years are held out for out-of-sample validation. Window sensitivity
-is reported transparently.
+international comparison and from the ONS for UK nations. The monitoring index is
+a two-sample comparison of the mean annual $e_0$ change in a post-2010
+observation window against the 1991–2010 calibration mean: the maximising
+slowdown proportion equals the ratio of these two means. We report the point
+slowdown, and a likelihood-ratio test of "some slowdown" against "no slowdown"
+(Normal likelihood, calibration variance treated as known). An earlier version
+framed the same quantity as a Bayes factor; it is more precisely a profile
+likelihood ratio, and the likelihood engine was separately corrected for an
+operator-precedence bug (see @sec-methods and the audit appendix). Window
+sensitivity is reported transparently.
 
 **Results.** A breakpoint near 2010 is confirmed for the UK and all constituent
-nations except Northern Ireland. The pre-pandemic window puts the UK slowdown at
-about `r hl_f`% (females) and `r hl_m`% (males) of the earlier improvement rate;
-restricting to 2011–2018 reproduces the original paper's ~61%/61% exactly, the
-difference being the strong 2019 recovery year. With the corrected likelihood
-the evidence for a slowdown is **stronger for males than females** (UK males
-Bayes factor ≈ `r f2(bf18_get("United Kingdom","male"))`, "strong"; females ≈
-`r f2(bf18_get("United Kingdom","female"))`, "positive"). Out-of-sample, the
-2020 pandemic shock lies far outside the model, but 2022–2024 improvement
-returned to about the reduced rate the pre-2020 data already implied. The newest
-ONS rounds (2020-, 2022-, 2024-based) sit close to the pre-pandemic benchmark
-rather than far below it: the sharp downward revision happened over 2012–2018
-and has since stabilised.
+nations except Northern Ireland. Depending on where the observation window ends,
+the UK point slowdown is about `r hl_f`–`r repro_f`% (females) and
+`r hl_m`–`r repro_m`% (males) of the earlier improvement rate; the 2011–2018
+window reproduces the original paper's ~61%/61% exactly, and the strong 2019
+recovery year lowers it. The point slowdown is real and sizeable, but formal
+significance is reached for only `r n_sig` of 10 population–sex cells — UK and
+England **males** (LR $p$ = `r f3(lr_get("United Kingdom","male", p_value))` and
+`r f3(lr_get("England","male", p_value))`); every female cell and Northern
+Ireland are consistent with a slowdown but not individually significant given
+their noise. Because England is a large deterministic component of the UK, those
+two significant cells are effectively **one** independent signal (annual-change
+correlation ≈ `r f3(cor_uk_eng_m)`), not a cross-population pattern.
+Descriptively, the 2020 pandemic shock lies far outside the model, and 2022–2024
+improvement overshot the pre-2020 implied rate by about
+`r f2(oos_overshoot("male"))`× before the shock and rebound partly cancel over
+2020–2024. The newest ONS rounds (2020-, 2022-, 2024-based) sit close to the
+pre-pandemic benchmark rather than far below it.
 
 **Conclusion.** The stalling in UK $e_0$ improvement after 2010 was real and
-roughly halved the earlier rate, but the post-pandemic recovery weakens any
-"stalling has only worsened" narrative, and the most recent ONS assumptions are
-broadly in line with — not markedly more pessimistic than — the pre-pandemic
-evidence. The Bayes-factor method provides a transparent, rapidly-updatable
-interim estimate between biennial ONS releases.
+roughly halved the earlier rate, but the evidence for it as a distinct
+statistical signal rests on essentially one male series, and the partial
+post-2020 recovery weakens any "stalling has only worsened" narrative. The value
+of the index is transparency and timeliness between biennial ONS releases, not a
+novel inferential apparatus.
 
 # Introduction
 
@@ -264,8 +301,9 @@ Up until 2010, ONS forecasts of life-expectancy gains consistently
 underestimated rates of improvement, and the assumptions were successively
 uprated and made more optimistic in successive revisions [@ons_npp_accuracy].
 Since 2010, however, the life-expectancy improvement assumptions made by the ONS
-have proven too optimistic, and were then successively made more pessimistic for
-several revisions in a row.
+initially proved too optimistic, and were then successively made more pessimistic
+for several revisions in a row; as we show below, the most recent rounds have
+largely stabilised rather than continuing downward.
 
 In parallel with the ONS' attempts to project life-expectancy trends, academic
 demographers and commercial actuaries have also made predictions. A number of
@@ -305,35 +343,38 @@ particular [@murphy2019stalling].
 
 This paper focuses on how ONS mortality projections have changed over this period
 of stalling UK life expectancy, and on how new annual data can be better used to
-inform assumptions about future trajectories. We introduce a complementary
-approach to evaluating and updating beliefs about how substantial and persistent
-the post-2010 stalling has been, which uses Bayes factors [@kass1995bayes] to
-compare the likelihood of the observed post-2010 improvements under continued
-pre-2010 trends against a family of slowdown scenarios. The approach allows quick
-updating of beliefs whenever a new annual life-expectancy estimate is released,
-so that interim projections can be produced in the years between the biennial
-ONS releases.
+inform assumptions about future trajectories. We set out a simple, transparent
+**monitoring index** for how substantial the post-2010 stalling has been: a
+two-sample comparison of the mean annual $e_0$ change since 2010 against the
+1991–2010 mean, accompanied by a likelihood-ratio test of whether the slowdown is
+distinguishable from noise. The index can be recomputed within minutes of each
+annual ONS release, so that a transparent interim summary of the underlying
+improvement rate can be produced in the years between the biennial ONS releases.
+Its contribution is timeliness and audit-grade reproducibility, not a novel
+estimator: as we show in @sec-methods, the index reduces to a rescaled mean
+comparison.
 
 This is a **substantially revised analysis**. Relative to the original
 2019-vintage draft it (i) extends the observed $e_0$ series from 2018 to 2024;
-(ii) corrects an operator-precedence error in the likelihood engine that had
-attenuated every reported Bayes factor toward 1 (see @sec-methods and the audit
-appendix); and (iii) reframes the study around **forecast validation** — a
-headline estimated on pre-pandemic data (to 2019) whose implied future
-improvement rate is then validated out-of-sample against 2020–2024, years the
-original analysis could not see. This reframing is prompted by two findings the
-extended data force upon us: the pre-pandemic estimate is sensitive to whether
-the window ends in 2018 or 2019, and the 2020 pandemic year is not an ordinary
-draw from the pre-pandemic process.
+(ii) corrects an operator-precedence error in the likelihood engine (see
+@sec-methods and the audit appendix); and (iii) recasts the estimator honestly as
+a monitoring index — a profile likelihood ratio and its associated LR test —
+rather than the "Bayes factor" of earlier drafts, and reports what formal
+significance the data actually support. Two findings the extended data force upon
+us shape the presentation: the point slowdown is sensitive to whether the
+observation window ends in 2018 or 2019, and the 2020 pandemic year is not an
+ordinary draw from the pre-pandemic process, so we compare (not validate) the
+pre-pandemic estimate against 2020–2024 descriptively.
 
 The rest of the paper proceeds as follows. We first place the UK slowdown in
 international context (@sec-intl). We then examine UK-nation $e_0$ trends and
 locate the breakpoint (@sec-uk). We present five decades of ONS projections
-against observed $e_0$ (@sec-projns). We then give the Bayes-factor estimate of
-the slowdown with transparent window sensitivity (@sec-bf), validate the
-pre-pandemic estimate out-of-sample (@sec-oos), and compare the estimate against
-every ONS round from 2012 to 2024 (@sec-bfons). A discussion (@sec-discussion)
-synthesises and sets out limitations.
+against observed $e_0$ (@sec-projns). We then give the monitoring-index estimate
+of the slowdown with its significance test and transparent window sensitivity
+(@sec-bf), compare the pre-pandemic estimate against 2020–2024 as a persistence
+check (@sec-oos), and set the estimate against every ONS round from 2012 to 2024
+(@sec-bfons). A discussion (@sec-discussion) synthesises and sets out
+limitations.
 
 # Methods {#sec-methods}
 
@@ -364,61 +405,94 @@ years on average, with the notable exception of Wales, which disagrees by up to
 0.17 years (see @sec-discussion). The final actual point (2024) is the NPP
 projection base year (mid-2024) and is therefore part-estimated.
 
-**Bayes-factor definition.** For each population and sex we model annual $e_0$
-change as independent Normal draws. Calibrating on the annual changes for
-1991–2010 (i.e. $e_0$ *levels* 1990–2010) gives a mean $\hat\mu$ and variance
-$\hat\sigma^2$. We then define a family of 101 proportional-slowdown scenarios,
-each with mean $\mu = p\,\hat\mu$ for $p$ running from 1 (no slowdown) down to 0
-(100% slowdown), sharing the calibration variance. For an observation window of
-post-2010 annual changes $x$, the Bayes factor of a scenario against the
-no-slowdown null is the likelihood ratio
+**Monitoring-index definition.** For each population and sex we model annual
+$e_0$ change as independent Normal draws. Calibrating on the annual changes for
+1991–2010 (i.e. $e_0$ *levels* 1990–2010) gives a mean $\hat\mu_0$ and variance
+$\hat\sigma^2$. For an observation window of post-2010 annual changes $x$ with
+mean $\bar x$, the index summarises the slowdown by the ratio of the two means,
 
 $$
-\mathrm{BF}(p) \;=\; \frac{\prod_i \phi\!\big(x_i;\, p\hat\mu,\, \hat\sigma^2\big)}
-                          {\prod_i \phi\!\big(x_i;\, \hat\mu,\, \hat\sigma^2\big)},
+\text{rate ratio} \;=\; \frac{\bar x}{\hat\mu_0},
+\qquad
+\text{slowdown \%} \;=\; 100\left(1 - \frac{\bar x}{\hat\mu_0}\right),
 $$
 
-where $\phi$ is the Normal density. A value above 1 favours a slowdown over
-no-slowdown; we report the scenario that maximises $\mathrm{BF}(p)$ and interpret
-magnitudes on the @kass1995bayes scale. Because corrected Bayes factors can
-overflow `exp()` for long windows, magnitudes are reported on a
-$\log_{10}$ scale where convenient.
+so the estimator is simply a **two-sample comparison of the mean annual $e_0$
+change** in the observation window against the calibration window. This is not
+incidental: if one profiles a family of proportional-slowdown scenarios with
+means $p\,\hat\mu_0$ ($0 \le p \le 1$) against the no-slowdown null $p=1$, the
+maximising proportion is exactly $p^\star = \bar x / \hat\mu_0$ (clipped to
+$[0,1]$), so the whole apparatus reduces to the mean ratio above. We treat this
+transparency as the feature it is, rather than dressing it up as a bespoke
+estimator.
+
+**A note on the earlier framing.** Earlier drafts of this work described the
+maximised likelihood ratio $\max_p \prod_i \phi(x_i; p\hat\mu_0,\hat\sigma^2) /
+\prod_i \phi(x_i; \hat\mu_0,\hat\sigma^2)$ (with $\phi$ the Normal density) as a
+"Bayes factor" and read its magnitude on the @kass1995bayes scale. With no prior
+and no integration this quantity is a **profile likelihood ratio**, not a Bayes
+factor, and the Kass–Raftery "positive/strong evidence" labels do not apply; we
+therefore drop them. We retain the profile likelihood ratio (denoted PLR) only as
+a continuity summary alongside the primary inferential quantity below. (This is a
+separate matter from the likelihood-code bug documented next; see the audit
+appendix for that history.)
+
+**Significance test.** As the primary inferential summary we report a
+likelihood-ratio test of $H_0\!:$ the observation-window mean equals the
+calibration mean (no slowdown) against $H_1\!:$ the observation-window mean is
+free, with the calibration variance treated as known. The statistic
+$2\big(\ell(\bar x) - \ell(\hat\mu_0)\big)$ is referred to a $\chi^2_1$
+distribution to give a $p$-value. This makes explicit what the profile likelihood
+ratio only implies: whether the observed shortfall is distinguishable from the
+noise in annual $e_0$ changes.
 
 **Corrected likelihood.** The likelihood function in the original drafts
 contained an operator-precedence error: the term intended as `1 / (2 * sig_sq)`
 was written `(1 / 2 * sig_sq)`, which R evaluates as `0.5 * sig_sq`. Because the
 first two terms of the Normal log-likelihood cancel in any likelihood ratio, the
-Bayes factor is affected only through the quadratic term, giving
-$\log\mathrm{BF}_{\text{legacy}} = \sigma^4 \log\mathrm{BF}_{\text{correct}}$.
+ratio is affected only through the quadratic term, giving
+$\log\mathrm{LR}_{\text{legacy}} = \sigma^4 \log\mathrm{LR}_{\text{correct}}$.
 As $\sigma$ for annual $e_0$ change is roughly 0.1–0.25 years, this attenuated
-every reported Bayes factor toward 1 by three to four orders of magnitude,
+every reported likelihood ratio toward 1 by three to four orders of magnitude,
 which is why the original manuscript reported values indistinguishable from 1.
-The BF-*maximising* slowdown percentage is a monotone transform of the sum of
+The *maximising* slowdown percentage is a monotone transform of the sum of
 squares and is therefore **unaffected** by the fix; only the magnitudes change.
-The corrected engine (`R/bayes_factors.R`) uses `dnorm`; the fix and its impact
-on the original 2011–2018 findings are quantified in the audit appendix
+The corrected engine (`R/bayes_factors.R`) uses `dnorm`, and the monitoring index
+(`R/monitoring_index.R`) is built on it; the fix and its impact on the original
+2011–2018 findings are quantified in the audit appendix
 (`audit/get_ll_fix_impact.qmd`).
 
-**Pre-2020 headline and out-of-sample design.** The 2020–2021 pandemic years are
-plainly not ordinary draws from the pre-pandemic process, and even 2019 already
-showed a recovery in improvement. We therefore treat a pre-pandemic observation
-window (2011–2019) as the headline, and hold out 2020–2024 as an out-of-sample
-test of the improvement rate that headline implies. For transparency we also
+**Pre-2020 headline and the 2020–2024 comparison.** The 2020–2021 pandemic years
+are plainly not ordinary draws from the pre-pandemic process, and even 2019
+already showed a recovery in improvement. We therefore treat a pre-pandemic
+observation window (2011–2019) as the headline, alongside the 2011–2018 window
+that reproduces the original analysis. We then compare — descriptively, not as a
+forecast validation — the improvement rate the pre-pandemic data imply against
+what 2020–2024 actually delivered. As shown in @sec-oos, the monitoring-index
+identity means the "pre-2020 implied gain" *is* the 2011–2019 sample mean, so this
+is a persistence check, not a test of forecast skill. For transparency we also
 report a full series (2011–2024) and a COVID-excluded series (2011–2024 dropping
 2020–2021), and do not privilege any single number without stating the others.
 
 # Results 1: International context {#sec-intl}
 
 Slowdowns in $e_0$ gain have been observed in a number of high-income nations in
-recent years, but have been more severe in the UK than in almost all other
-high-income nations except the USA. @fig-intl arranges HMD nations by their
-average annual improvement in the 2010s. The nations with the fastest recent
-improvement are Russia and Eastern European countries (e.g. Belarus, Ukraine,
-Russia, Lithuania, Poland), while the slowest gains are seen in the USA, Iceland,
-the UK, the Netherlands and Germany. In general, nations with the worst changes
-in the 1980s and 1990s have tended to see the fastest improvement in the 2010s,
-and vice versa. Notably, average improvement rates in Germany and the UK in the
-2010s are within about 0.01 years/year of one another.
+recent years. On the (stale, ragged) HMD vintage used here the UK sits among the
+slowest-improving high-income nations, alongside the USA, Iceland, the
+Netherlands and Germany, but this comparison should be read with caution: the HMD
+extract underlying @fig-intl ends around 2016 for most named comparators (and
+2013–14 for some), whereas the UK series elsewhere in this paper runs to 2024, so
+the "2010s" ordering is a truncated, country-specific window. We therefore do not
+make a firm claim about the UK's *relative* severity here; refreshing the
+comparison to a current common HMD vintage is flagged below and is being
+undertaken separately. @fig-intl arranges HMD nations by their average annual
+improvement in the 2010s. The nations with the fastest recent improvement are
+Russia and Eastern European countries (e.g. Belarus, Ukraine, Russia, Lithuania,
+Poland), while the slowest gains are seen in the USA, Iceland, the UK, the
+Netherlands and Germany. In general, nations with the worst changes in the 1980s
+and 1990s have tended to see the fastest improvement in the 2010s, and vice
+versa. Notably, average improvement rates in Germany and the UK in the 2010s are
+within about 0.01 years/year of one another.
 
 ```{r}
 #| label: fig-intl
@@ -435,11 +509,14 @@ UK, the Netherlands and Germany) is shown in @fig-intl-selected.
 knitr::include_graphics(rp("bayes_paper", "figures", "A02_selected_high_income.png"))
 ```
 
-[TODO: the full 38-nation decade table (original Table R1.1) is not reproduced
-here; the international decade values above are read from the regenerated HMD
-figures. If a numeric table is wanted in the final manuscript, regenerate it to
-the latest HMD vintage from `analysis/01_international_trends.qmd` rather than
-copying the original draft's values, whose HMD extract ended around 2016.]
+[TODO: the international comparison uses a pre-2017 HMD vintage
+(`data/e0_hmd.csv`, ending ~2016 for most named comparators) and is being
+refreshed to a current common vintage via the download pipeline in the sibling
+`hmd-population-discrepancies` repo (blocked only on refreshing HMD session
+credentials). Until then this section is illustrative, not current, and the
+relative-severity ordering should not be quoted. The full 38-nation decade table
+(original Table R1.1) is likewise deferred to the refreshed vintage rather than
+copying the original draft's truncated values.]
 
 # Results 2: UK trends and the breakpoint {#sec-uk}
 
@@ -528,7 +605,7 @@ assumed by each round from 2012 onwards. Even the 2012 round assumed rates below
 the observed 1980s–2000s rates, so may have been considered conservative at the
 time; each successive biennial round to 2018 assumed slower improvement than the
 last. The extension of the table to the 2020-, 2022- and 2024-based rounds is
-discussed in @sec-bfons, where it is set against the Bayes-factor benchmark.
+discussed in @sec-bfons, where it is set against the monitoring-index benchmark.
 
 ```{r}
 #| label: tbl-ons-assumed
@@ -540,46 +617,83 @@ uk_cmp %>%
   kbl() %>% kable_styling(full_width = FALSE)
 ```
 
-# Results 4: Bayes-factor estimate of the slowdown {#sec-bf}
+# Results 4: Monitoring-index estimate of the slowdown {#sec-bf}
 
 This section quantifies how far post-2010 UK improvement has fallen short of the
-1991–2010 trend, using the Bayes-factor method of @sec-methods. For each
-population and sex we identify the proportional-slowdown scenario that maximises
-the Bayes factor against the no-slowdown null, and report the strength of
-evidence at that maximum. @fig-bf-schedules shows the $\log_{10}$ Bayes-factor
-schedules for the pre-pandemic headline window.
+1991–2010 trend, using the monitoring index of @sec-methods: the ratio of the
+observation-window mean annual $e_0$ change to the calibration mean, with a
+likelihood-ratio test of whether that shortfall is distinguishable from noise.
+@fig-bf-schedules shows the profile-likelihood-ratio schedules for the
+pre-pandemic window; the point slowdown is where each curve peaks.
 
 ```{r}
 #| label: fig-bf-schedules
-#| fig-cap: "Bayes-factor schedules (log10 BF against proposed percentage slowdown) for the pre-pandemic 2011-2019 window, by population and sex. Values above zero favour a slowdown over no slowdown."
+#| fig-cap: "Profile-likelihood-ratio schedules (log10 PLR against proposed percentage slowdown) for the pre-pandemic 2011-2019 window, by population and sex. Each curve peaks at the maximising slowdown; the height of the peak is the profile likelihood ratio, not a Bayes factor. (Figure generated by the earlier engine and labelled 'Bayes Factor'; the plotted quantity is the profile likelihood ratio.)"
 knitr::include_graphics(rp("figures", "A12_Bayes_Factor_Schedules_2024.png"))
 ```
 
-**Corrected magnitudes.** With the likelihood bug fixed, the maximised Bayes
-factors are far larger than the ~1.00 values of the original drafts, while the
-maximising percentages are unchanged. On the 2011–2018 window that reproduces the
-original analysis, UK males reach a Bayes factor of about
-`r f2(bf18_get("United Kingdom","male"))` and England males about
-`r f2(bf18_get("England","male"))` — "strong" evidence on the @kass1995bayes
-scale — whereas the corresponding females reach about
-`r f2(bf18_get("United Kingdom","female"))` (UK) and
-`r f2(bf18_get("England","female"))` (England), i.e. "positive" evidence, and
-Northern Ireland males remain genuinely equivocal
-(`r f2(bf18_get("Northern Ireland","male"))`). This **inverts the emphasis of
-the original draft**: the evidence for a slowdown is stronger for males than for
-females, because female annual $e_0$ changes are noisier relative to their
-smaller mean improvement (@sec-methods), so a given shortfall is harder to
-distinguish from noise for females. The original draft's suggestion that the ONS
-remained too optimistic *mainly* for females rested partly on the attenuated
-magnitudes and does not survive the correction.
+**Primary inferential summary.** @tbl-lr reports, for the 2011–2018 window that
+reproduces the original analysis, the point slowdown, the rate ratio, the LR
+statistic and its $p$-value, and the profile likelihood ratio, for every
+population and sex.
+
+```{r}
+#| label: tbl-lr
+#| tbl-cap: "Monitoring index, 2011-2018 window (reproducing the original analysis), calibration 1991-2010. Slowdown % = 100(1 - rate ratio); rate ratio = observation-window mean / calibration mean annual e0 change. LR stat and p-value test 'some slowdown' vs 'no slowdown' (chi-square, 1 df). PLR is the profile likelihood ratio (the quantity earlier mislabelled a Bayes factor). Only UK and England males reach p<0.05."
+lr_1118 %>%
+  transmute(Population = population, Sex = sex,
+            `Slowdown %` = round(slowdown_pct),
+            `Rate ratio` = round(rate_ratio, 2),
+            `LR stat` = round(lr_stat, 2),
+            `p-value` = f3(p_value),
+            PLR = round(plr, 1)) %>%
+  kbl() %>% kable_styling(full_width = FALSE)
+```
+
+The point slowdown is real and sizeable everywhere except Northern Ireland — a
+40–60% reduction on the earlier improvement rate across most cells — **but formal
+significance is another matter**. Only `r n_sig` of the 10 population–sex cells
+reach $p<0.05$: UK males ($p$ = `r f3(lr_get("United Kingdom","male", p_value))`)
+and England males ($p$ = `r f3(lr_get("England","male", p_value))`). Every female
+cell is consistent with a slowdown but not individually significant given its
+noise — UK females $p$ = `r f3(lr_get("United Kingdom","female", p_value))`,
+England females `r f3(lr_get("England","female", p_value))`, Scotland females
+`r f3(lr_get("Scotland","female", p_value))`, Wales females
+`r f3(lr_get("Wales","female", p_value))`, Northern Ireland females
+`r f3(lr_get("Northern Ireland","female", p_value))` — and the remaining male
+cells (Scotland `r f3(lr_get("Scotland","male", p_value))`, Wales
+`r f3(lr_get("Wales","male", p_value))`, Northern Ireland
+`r f3(lr_get("Northern Ireland","male", p_value))`) are likewise
+non-significant. The proper reading is therefore: the *point* slowdown is large,
+but the data support it as a distinct statistical signal only for males, and only
+in the two most data-rich cells. Extending the window by one year to 2011–2019
+leaves this pattern unchanged (UK males $p$ =
+`r f3(lr_get("United Kingdom","male", p_value, lr_pre2020))`, England males $p$ =
+`r f3(lr_get("England","male", p_value, lr_pre2020))`, all others
+non-significant); the point slowdown falls (see window sensitivity below) but the
+inference does not move.
+
+**The two significant cells are one signal, not a pattern.** The apparent
+"stronger evidence for males" must not be read as replication across populations.
+The five populations are really about four nations — the UK is a deterministic
+aggregate of its constituent nations, not an independent fifth series — and
+**England dominates the UK**, accounting for roughly 84% of its population. The
+UK-male and England-male annual-change series are almost perfectly correlated
+(cor ≈ `r f3(cor_uk_eng_m)`), so the two significant cells are essentially **one**
+independent observation, replicated by construction rather than by evidence. In
+other words, the whole formal-significance case rests on a single male signal;
+there is no cross-population corroboration, and no adjustment for having examined
+several populations, both sexes and multiple windows would leave it looking
+stronger.
 
 **Window sensitivity.** @tbl-bf-maximise gives, for every population and sex, the
-BF-maximising slowdown percentage and its $\log_{10}$ Bayes factor under the
-three observation-window variants.
+point slowdown percentage (and the $\log_{10}$ profile likelihood ratio at that
+maximum) under the three observation-window variants. The point slowdown is
+visibly window-sensitive; the significance pattern above is not.
 
 ```{r}
 #| label: tbl-bf-maximise
-#| tbl-cap: "BF-maximising slowdown (% below the 1991-2010 mean improvement) and log10 Bayes factor at that maximum, by observation-window variant. Pre-2020 is the headline; Full series and COVID-excluded are shown for transparency."
+#| tbl-cap: "Point slowdown (% below the 1991-2010 mean improvement) and log10 profile likelihood ratio at the maximum, by observation-window variant. Pre-2020 is the headline; Full series and COVID-excluded are shown for transparency. These are point estimates, not evidence labels."
 bf_argmax %>%
   mutate(cell = paste0(round(slowdown_pct), "% (", f2(log10_bf), ")")) %>%
   select(Population = population, Sex = sex, variant, cell) %>%
@@ -587,7 +701,7 @@ bf_argmax %>%
   arrange(Population, Sex) %>%
   kbl() %>%
   kable_styling(full_width = FALSE) %>%
-  add_header_above(c(" " = 2, "Slowdown % (log10 BF)" = 3))
+  add_header_above(c(" " = 2, "Slowdown % (log10 PLR)" = 3))
 ```
 
 Restricting the observation window to the pre-pandemic **2011–2018** span exactly
@@ -609,23 +723,26 @@ for females and 1.20 for males in 2020), which a Normal-iid likelihood wrongly
 treats as an ordinary draw. Conversely, **excluding 2020–2021 pulls the estimate
 down to `r cov_f`%/`r cov_m`%** — but this is not a clean "no slowdown" reading
 either: it is pulled *up* by the genuine 2022–2024 recovery, which the original
-2019-vintage analysis could not see. No single number is unambiguous; the
-pre-pandemic headline plus explicit out-of-sample validation (@sec-oos) is the
-most honest framing.
+2019-vintage analysis could not see. No single number is unambiguous; reporting
+the full set of windows, together with the descriptive 2020–2024 comparison
+(@sec-oos), is the most honest framing.
 
-# Results 5: Out-of-sample validation {#sec-oos}
+# Results 5: Persistence comparison against 2020–2024 {#sec-oos}
 
-The pre-pandemic (2011–2019) window is, in effect, a forecast: it implies, for
-each population and sex, a best-supported mean annual $e_0$ gain equal to the
-1991–2010 mean multiplied by the BF-maximising proportion. Because 2020–2024 were
-not used to fit it, they provide a genuine out-of-sample test of that forecast.
-@tbl-oos sets the pre-2020-implied gain against what was actually observed, and
-@fig-oos shows the observed 2020–2024 annual changes against the pre-pandemic
-best forecast.
+It is tempting to treat the pre-pandemic (2011–2019) window as a forecast and the
+2020–2024 outturn as an out-of-sample validation of it. We resist that framing,
+for two reasons. First, by the monitoring-index identity (@sec-methods) the
+"pre-2020 implied gain" *is simply the 2011–2019 sample mean* — there is no
+predictive distribution, no interval and no scoring rule, so comparing it to a
+later mean is a **persistence check**, not a test of forecast skill. Second, the
+pre-2020 window was itself chosen *after* seeing that 2019 recovered and 2020
+crashed, so it is not a prospective forecast. @tbl-oos therefore sets the
+pre-2020-implied gain against the 2020–2024 outturn descriptively, and @fig-oos
+plots the same comparison.
 
 ```{r}
 #| label: tbl-oos
-#| tbl-cap: "Out-of-sample validation: pre-pandemic (2011-2019) best-supported annual e0 gain (years/year) versus observed 2020-2024 changes. The 2024 actual is part-estimated (2024-based NPP base year)."
+#| tbl-cap: "Persistence comparison (not a validation): pre-pandemic (2011-2019) implied annual e0 gain -- which by the monitoring-index identity is the 2011-2019 mean -- against observed 2020-2024 changes (years/year). The 2024 actual is part-estimated (2024-based NPP base year)."
 validation_table %>%
   transmute(Population = population, Sex = sex,
             `Pre-2020 implied` = round(implied_annual, 3),
@@ -637,33 +754,38 @@ validation_table %>%
 
 ```{r}
 #| label: fig-oos
-#| fig-cap: "Observed 2020-2024 annual e0 change (bars) against the mean annual gain implied by the pre-pandemic 2011-2019 BF-maximising scenario (dashed line), by population and sex. The 2024 actual is part-estimated."
+#| fig-cap: "Observed 2020-2024 annual e0 change (bars) against the pre-pandemic 2011-2019 mean annual gain (dashed line), by population and sex. This is a persistence comparison, not a forecast validation. The 2024 actual is part-estimated."
 knitr::include_graphics(rp("figures", "A14_out_of_sample_validation_2024.png"))
 ```
 
-The out-of-sample picture is dominated by two offsetting features. The **2020
-shock** is far outside anything the pre-pandemic model contemplated (UK:
-`r f3(oos_g("female","obs_2020"))` years for females,
-`r f3(oos_g("male","obs_2020"))` for males). But the **2022–2024 recovery** is
-real and substantial: over 2022–2024 the UK averaged
-`r f3(oos_g("female","obs_mean_2022_24"))` years/year for females and
-`r f3(oos_g("male","obs_mean_2022_24"))` for males, both at or above the
-pre-pandemic best-supported gains of `r f3(oos_g("female","implied_annual"))`
-(female) and `r f3(oos_g("male","implied_annual"))` (male). Averaged across the
-whole 2020–2024 window the shock and recovery partly cancel (UK mean
+Read honestly, the comparison neither confirms nor refutes a forecast — because
+there was no probabilistic forecast to confirm. What it does show is two large
+offsetting features. The **2020 shock** is far outside anything the pre-pandemic
+mean contemplated (UK: `r f3(oos_g("female","obs_2020"))` years for females,
+`r f3(oos_g("male","obs_2020"))` for males). The **2022–2024 recovery** then
+*overshoots* the pre-2020 implied rate substantially: over 2022–2024 the UK
+averaged `r f3(oos_g("female","obs_mean_2022_24"))` years/year for females and
+`r f3(oos_g("male","obs_mean_2022_24"))` for males, about
+`r f2(oos_overshoot("female"))`× and `r f2(oos_overshoot("male"))`× the pre-2020
+implied gains of `r f3(oos_g("female","implied_annual"))` (female) and
+`r f3(oos_g("male","implied_annual"))` (male). Averaged across the whole
+2020–2024 window the shock and rebound roughly cancel (UK mean
 `r f3(oos_g("female","obs_mean_2020_24"))` female,
-`r f3(oos_g("male","obs_mean_2020_24"))` male). The substantive message is that
-the recovery materially weakens any naive "the stalling has only worsened"
-narrative: post-pandemic improvement has returned to roughly the
-reduced-but-positive rate the pre-2020 data already implied, rather than
-collapsing further. This is the single most important substantive update since
-the original analysis.
+`r f3(oos_g("male","obs_mean_2020_24"))` male), which is *why* the 5-year mean
+happens to land near the pre-2020 rate — a coincidence of cancellation, not a
+vindicated point forecast. The substantive message survives regardless of
+framing: post-2020 improvement did not collapse further but rebounded, which
+weakens any naive "the stalling has only worsened" narrative. A genuinely
+prospective test would require pre-registering the implied rate and a scoring
+rule *before* the data arrive; we flag this as the natural next step rather than
+claiming it here. The 2022–2024 rebound should also be read with the
+period-vs-cohort caveat of @sec-discussion in mind.
 
 # Results 6: Comparison with ONS assumptions {#sec-bfons}
 
-Finally we set the pre-pandemic Bayes-factor benchmark — the single
-best-supported mean annual gain per population and sex — against the mean annual
-$e_0$ improvement implied by each ONS projection round from 2012 to 2024
+Finally we set the pre-pandemic monitoring-index benchmark — the pre-2020 implied
+mean annual gain per population and sex — against the mean annual $e_0$
+improvement implied by each ONS projection round from 2012 to 2024
 [@ons_expectation_of_life]. Anchoring the comparison on the pre-pandemic window
 (rather than a series including the COVID shock) keeps it clean: the ONS rounds
 are themselves projections of a smoothly improving process. @tbl-bfons and
@@ -671,21 +793,21 @@ are themselves projections of a smoothly improving process. @tbl-bfons and
 
 ```{r}
 #| label: tbl-bfons
-#| tbl-cap: "Mean implied annual e0 gain (years/year) by ONS round versus the fixed pre-pandemic Bayes-factor benchmark, UK. A round below the benchmark projected slower improvement than the pre-2020 data implied (relatively pessimistic); above it, relatively optimistic."
+#| tbl-cap: "Mean implied annual e0 gain (years/year) by ONS round versus the fixed pre-pandemic monitoring-index benchmark, UK. A round below the benchmark projected slower improvement than the pre-2020 data implied (relatively pessimistic); above it, relatively optimistic. See text for the horizon-mismatch caveat."
 uk_cmp %>%
   transmute(Round = round, Sex = sex,
-            ONS = round(ons_mu, 3), `BF (pre-2020)` = round(bf_mu, 3)) %>%
-  pivot_wider(names_from = Sex, values_from = c(ONS, `BF (pre-2020)`)) %>%
-  select(Round, ONS_female, `BF (pre-2020)_female`, ONS_male, `BF (pre-2020)_male`) %>%
+            ONS = round(ons_mu, 3), `Index (pre-2020)` = round(bf_mu, 3)) %>%
+  pivot_wider(names_from = Sex, values_from = c(ONS, `Index (pre-2020)`)) %>%
+  select(Round, ONS_female, `Index (pre-2020)_female`, ONS_male, `Index (pre-2020)_male`) %>%
   arrange(Round) %>%
-  kbl(col.names = c("Round", "ONS", "BF (pre-2020)", "ONS", "BF (pre-2020)")) %>%
+  kbl(col.names = c("Round", "ONS", "Index (pre-2020)", "ONS", "Index (pre-2020)")) %>%
   kable_styling(full_width = FALSE) %>%
   add_header_above(c(" " = 1, "Female" = 2, "Male" = 2))
 ```
 
 ```{r}
 #| label: fig-bfons
-#| fig-cap: "ONS-implied annual e0 gain by projection round (2012-2024) against the fixed pre-pandemic Bayes-factor benchmark, UK. The Bayes-factor benchmark is constant because it is the single pre-pandemic best estimate."
+#| fig-cap: "ONS-implied annual e0 gain by projection round (2012-2024) against the fixed pre-pandemic monitoring-index benchmark, UK. The benchmark is constant because it is the single pre-pandemic estimate."
 knitr::include_graphics(rp("bayes_paper", "figures", "M03_ons_cf_bayes_2024.png"))
 ```
 
@@ -695,95 +817,138 @@ fell from `r f3(uk_get("female", 2012))` years/year (2012 round) toward the
 pre-pandemic benchmark of `r f3(bf_f)`, and for males from
 `r f3(uk_get("male", 2012))` toward `r f3(bf_m)`.
 
-The key new finding is that **the newest rounds have stabilised close to the
-pre-2020 benchmark rather than continuing far below it**. For UK females the
-2020-, 2022- and 2024-based rounds imply `r f3(uk_get("female", 2020))`,
+On its face the newest rounds appear to have **stabilised close to the pre-2020
+benchmark rather than continuing far below it**. For UK females the 2020-, 2022-
+and 2024-based rounds imply `r f3(uk_get("female", 2020))`,
 `r f3(uk_get("female", 2022))` and `r f3(uk_get("female", 2024))` years/year
 respectively — all at or slightly *above* the benchmark of `r f3(bf_f)`. For UK
 males the same rounds imply `r f3(uk_get("male", 2020))`,
 `r f3(uk_get("male", 2022))` and `r f3(uk_get("male", 2024))`, straddling the
 benchmark of `r f3(bf_m)`. The sharp downward revision therefore happened over
-the 2012–2018 rounds and has since levelled off; the fan figure's apparent
-"sharp pessimism" of the newest rounds (@fig-fan) is about the post-COVID
-starting *level*, not the assumed *rate* of future gain. Combined with the
-corrected finding that the slowdown evidence is stronger for males than females
-(@sec-bf), the original draft's characterisation that the ONS "may still be
-underestimating the stalling, especially for females" no longer holds for the
-latest rounds: they are broadly in line with, not markedly more pessimistic
-than, the pre-pandemic evidence.
+the 2012–2018 rounds and appears to have since levelled off; the fan figure's
+apparent "sharp pessimism" of the newest rounds (@fig-fan) is about the post-COVID
+starting *level*, not the assumed *rate* of future gain.
+
+This "stabilised near the benchmark" reading, however, needs an important caveat.
+The ONS-implied gain here is the mean annual $e_0$ change over each round's
+*entire ~50-year projection horizon*, whereas the benchmark is a *near-term*
+(pre-2020) rate. Because annual $e_0$ gains decline over a projection horizon
+(rectangularisation) even at constant assumed mortality-improvement rates, a
+50-year average sits mechanically below the near-term rate — so part of the
+apparent convergence could be an artefact of the summary statistic rather than a
+genuine matching of assumptions. A cleaner comparison would recompute the
+ONS-implied gain over a matched near-term horizon (the first ~8–10 projection
+years), or compare age-specific assumed improvement rates directly. [TODO:
+recompute @tbl-bfons and @fig-bfons on a matched near-term horizon before
+leaning hard on the "stabilised near the benchmark" claim.] With that caveat, the
+defensible statement is the weaker one: the original draft's characterisation
+that the ONS "may still be underestimating the stalling, especially for females"
+is not supported by the latest rounds, which are at least broadly consistent
+with the pre-pandemic evidence rather than clearly more optimistic.
 
 # Discussion {#sec-discussion}
 
 This paper set out to quantify the post-2010 slowdown in UK life-expectancy
-improvement using a transparent, continually-updatable Bayes-factor method, and —
-in a substantial revision of the original analysis — to test a pre-pandemic
-estimate against the 2020–2024 outturn.
+improvement using a transparent, rapidly-updatable monitoring index, and — in a
+substantial revision of the original analysis — to compare a pre-pandemic
+estimate descriptively against the 2020–2024 outturn.
 
 The central findings are threefold. First, the stalling around 2010 was real: a
 breakpoint within a year of 2010 is confirmed for the UK and all constituent
-nations except Northern Ireland, and the pre-pandemic Bayes-factor estimate puts
-the UK slowdown at roughly `r hl_f`% (females) to `r hl_m`% (males) of the
-earlier improvement rate, reproducing the original ~61% exactly for the
-2011–2018 sub-window. Second, this headline is genuinely window-sensitive: the
-strong 2019 recovery year lowers it by around ten points, the 2020 shock inflates
-the full-series estimate, and excluding the pandemic years lowers it again — so
-no single point estimate is clean, and the honest presentation is the full set of
-windows plus out-of-sample validation. Third, the 2022–2024 recovery, invisible
-to the original 2019-vintage analysis, has returned improvement to about the
-reduced-but-positive rate the pre-2020 data already implied; and the newest ONS
-rounds have stabilised close to that same benchmark. Together these weaken a
-naive "the stalling has only worsened" narrative and soften the original policy
-implication.
+nations except Northern Ireland, and the pre-pandemic monitoring index puts the
+UK point slowdown at roughly `r hl_f`% (females) to `r repro_m`% (males) of the
+earlier improvement rate, reproducing the original ~61% exactly for the 2011–2018
+sub-window. But the *point* estimate and its *statistical significance* are
+different things: recast as likelihood-ratio tests, only `r n_sig` of 10
+population–sex cells reach $p<0.05$ (UK and England males), all female cells and
+Northern Ireland are non-significant, and — because England is ~84% of the UK and
+the two significant series correlate ≈ `r f3(cor_uk_eng_m)` — those two cells are
+effectively **one** independent signal, not a cross-population pattern. Second,
+this point estimate is genuinely window-sensitive: the strong 2019 recovery year
+lowers it by around ten points, the 2020 shock inflates the full-series estimate,
+and excluding the pandemic years lowers it again — so no single number is clean,
+and the honest presentation is the full set of windows plus the descriptive
+2020–2024 comparison. Third, the 2022–2024 recovery, invisible to the original
+2019-vintage analysis, has returned improvement to (and briefly above) the
+reduced-but-positive rate the pre-2020 data implied, and the newest ONS rounds
+sit close to that same benchmark (subject to the horizon caveat of @sec-bfons).
+Together these weaken a naive "the stalling has only worsened" narrative and
+soften the original policy implication.
 
 The **correction of the likelihood bug** does not change any maximising slowdown
 percentage — those are monotone in the sum of squares — but it restores
-meaningful evidence magnitudes and, in doing so, reverses the original draft's
-sex emphasis. The evidence for a slowdown is stronger for males (UK/England
-males reaching "strong" evidence on the @kass1995bayes scale) than for females
-("positive"), because female annual changes are noisier relative to their smaller
-mean gain. Any previously circulated numbers quoting Bayes-factor *magnitudes*
-should be treated as superseded by the corrected values reported here and in the
-audit appendix; the qualitative conclusions of the original work stand.
+meaningful likelihood-ratio magnitudes and, in doing so, reverses the original
+draft's sex emphasis. What signal there is is carried by males rather than
+females (the female series being noisier relative to their smaller mean gain), so
+the original draft's suggestion that the ONS remained too optimistic *mainly* for
+females does not survive. This is a statement about which series carries the
+signal, not an "evidence-strength" label: with no prior and no integration the
+quantity is a profile likelihood ratio, so we do not read it on the
+@kass1995bayes scale, and the formal case for a distinct slowdown signal rests on
+the single male cell described above. Any previously circulated numbers quoting
+"Bayes-factor" *magnitudes* or Kass–Raftery evidence labels should be treated as
+superseded by the likelihood-ratio $p$-values reported here and by the audit
+appendix.
 
-**Value of the method.** The Bayes-factor schedule can be recomputed within
-minutes of each annual ONS release, providing a transparent interim estimate of
-the underlying improvement rate in the years between the biennial NPP rounds. A
-commitment to publish an updated schedule on each release — made *before* the
-data are seen — would make the process of updating beliefs about the slowdown
-formal rather than informal, and would give researchers and policymakers a
-shared "ground truth" around which to reason even where they disagree about
-causes.
+**Value of the index.** The monitoring index can be recomputed within minutes of
+each annual ONS release, providing a transparent interim estimate of the
+underlying improvement rate in the years between the biennial NPP rounds. Its
+contribution is timeliness and audit-grade reproducibility, not a novel
+estimator — it is, transparently, a two-sample comparison of means. A commitment
+to publish an updated index on each release — made *before* the data are seen —
+would turn the descriptive comparison of @sec-oos into a genuinely prospective
+test, and would give researchers and policymakers a shared "ground truth" around
+which to reason even where they disagree about causes.
 
 **Limitations.** Several caveats bound the conclusions. (i) The Normal-iid
 likelihood treats every annual change as an exchangeable draw, which the 2020
 pandemic year plainly is not; we address this pragmatically by holding the
 pandemic years out of the headline and reporting window sensitivity, rather than
-by modelling a level shift or outlier explicitly — a natural extension. (ii) The
-outcome is *period* life expectancy at birth, a synthetic cross-sectional
-measure, not the realised lifespan of any cohort; period $e_0$ is more sensitive
-to transient shocks such as influenza seasons and the pandemic. (iii) Multiple
-populations, both sexes and several windows were examined, so individual
-"strong-evidence" cells should be read in the context of the family of tests
-rather than as isolated confirmatory results. (iv) The actual $e_0$ series
-splices two ONS sources; these agree closely except for **Wales**, where the
-single-year life tables and the NPP-embedded historic estimates disagree by up
-to ~0.17 years, likely because of population-estimate revisions following the
-2021 census — so the Welsh estimates in particular should be treated with
-caution. (v) The final actual point (2024) is the NPP projection base year and is
-part-estimated. (vi) The calibration and comparison rest on a single
-pre-slowdown window (1991–2010); the qualitative picture is robust, but the exact
-percentages depend on that choice.
+by modelling a level shift or outlier explicitly — a natural extension. (We note
+in passing that annual $e_0$ changes are in fact negatively autocorrelated
+(lag-1 ≈ −0.5), so the iid assumption is, if anything, *conservative* for the
+headline significance and does not inflate it.) (ii) **Period vs cohort, and
+harvesting.** The outcome is *period* life expectancy at birth, a synthetic
+cross-sectional index, not the realised lifespan of any cohort. This matters
+directly for the paper's headline update: a mortality shock like 2020 depletes
+the frailest of the older population, so the following years' *period* rates
+mechanically improve as the depleted-frail cohort produces fewer deaths — a
+"harvesting" rebound. The 2022–2024 recovery that we present as weakening the
+"stalling has only worsened" narrative is therefore at genuine risk of being, in
+part, a harvesting artefact of a synthetic index rather than a return of
+underlying mortality improvement; the two are not distinguishable from period
+$e_0$ alone. All recovery claims here should be read as statements about *period
+$e_0$ as a demographic index*; adjudicating harvesting versus genuine improvement
+would require a cohort, decomposition or lifespan-variation lens that this
+monitoring index does not provide. (iii) Multiple populations, both sexes and
+several windows were examined; as set out in @sec-bf the two significant cells are
+one signal by construction, so no individual cell should be read as independent
+confirmatory evidence. (iv) The actual $e_0$ series splices two ONS sources;
+these agree closely except for **Wales**, where the single-year life tables and
+the NPP-embedded historic estimates disagree by up to ~0.17 years, likely because
+of population-estimate revisions following the 2021 census — so the Welsh
+estimates in particular should be treated with caution. (v) The final actual
+point (2024) is the NPP projection base year and is part-estimated. (vi) The
+calibration and comparison rest on a single pre-slowdown window (1991–2010); the
+qualitative picture is robust, but the exact percentages depend on that choice.
+(vii) The international comparison (@sec-intl) rests on a pre-2017 HMD vintage on
+a ragged window and is not current; the relative-severity ordering should not be
+quoted until it is refreshed.
 
 **Policy reading.** The original work concluded that the most recent ONS forecast
 still appeared too optimistic and underestimated the UK slowdown. The extended,
-corrected analysis qualifies this. The slowdown was real and roughly halved the
-earlier improvement rate, and the UK's experience remains severe relative to
-other high-income nations; but the post-pandemic recovery and the stabilisation
-of the newest ONS rounds mean that, for the latest vintages, the ONS assumptions
-are broadly consistent with the pre-pandemic evidence rather than clearly too
-optimistic. Whether the modest 2022–2024 recovery is sustained — and whether the
-underlying drivers of the post-2010 stall have been addressed — remains an open
-question that the continually-updatable Bayes-factor method is well suited to
-track as each new year of data arrives.
+corrected analysis qualifies this. The point slowdown was real and roughly halved
+the earlier improvement rate, but the formal evidence for it as a distinct
+statistical signal rests on essentially one male series, and the post-pandemic
+recovery together with the stabilisation of the newest ONS rounds mean that, for
+the latest vintages, the ONS assumptions are broadly consistent with the
+pre-pandemic evidence rather than clearly too optimistic. We make no firm claim
+here about the UK's severity *relative* to other high-income nations, which the
+repo's current (stale) international data cannot support. Whether the modest
+2022–2024 recovery reflects genuine underlying improvement rather than a period
+harvesting rebound — and whether the drivers of the post-2010 stall have been
+addressed — remains open, and is exactly the kind of question the
+rapidly-updatable index is well suited to track as each new year of data
+arrives.
 
 # References {.unnumbered}
