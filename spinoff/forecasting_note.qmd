@@ -1,0 +1,94 @@
+---
+title: "Fifty years of forecasting UK life expectancy"
+subtitle: "How successive official projections have chased a moving target"
+author: "Jon Minton"
+date: today
+format:
+  html:
+    toc: true
+    code-fold: true
+bibliography: ../references.bib
+---
+
+# Summary
+
+For half a century the UK's official statisticians have published regular
+projections of how long we can expect to live. Plotting every vintage of
+those projections against what actually happened tells a clear,
+three-act story:
+
+1. **Under-projection (to ~2010).** Successive projections repeatedly
+   *underestimated* how fast life expectancy would rise. Each new round had
+   to be revised upward. Simple linear extrapolation of past gains would
+   have beaten the official forecasts --- the phenomenon @white2002longevity
+   and @oeppen2002broken drew attention to, and which led @lee2019mortality
+   to accept that directly extrapolating life expectancy is often adequate.
+2. **Over-projection (2010--2019).** Improvement stalled. The rounds from
+   2008--2016 kept projecting the old rate of gain and now sit well *above*
+   what was observed --- the forecasters were, for the first time in the
+   series, systematically too optimistic.
+3. **Shock and pessimism (2020--2024).** The pandemic produced a sharp drop
+   in 2020, and the 2020-, 2022- and 2024-based rounds are dramatically more
+   pessimistic than anything before them --- even as 2022--2024 show a
+   partial recovery.
+
+The single figure below is the whole argument.
+
+# The figure
+
+```{r}
+#| label: fig-fan
+#| fig-cap: "ONS life expectancy projection rounds, 1971 to 2024 (coloured, dark = older rounds), against actual estimates (black). Each coloured line is one projection vintage extrapolating forward from its base year."
+#| echo: false
+knitr::include_graphics(
+  here::here("bayes_paper", "figures", "M02_ons_lt_projns_updated.png")
+)
+```
+
+The figure is produced by `scripts/update_ons_projections_figure.R`, which
+combines the ONS National Population Projections accuracy-report underlying
+data (1971--2012 rounds) [@ons_npp_accuracy] with the biennial *expectation
+of life, principal projection* datasets (2014--2024 rounds)
+[@ons_expectation_of_life], overlaid on actual period life expectancy at
+birth.
+
+# The numbers behind the story
+
+Mean annual gain in UK period life expectancy at birth (years):
+
+| Era | Female | Male |
+|---|---|---|
+| 1991--2010 | 0.19 | 0.28 |
+| 2011--2019 | 0.10 | 0.12 |
+| 2020--2024 | 0.01 | −0.02 |
+
+The 2010s roughly halved the pre-2010 rate of improvement; the pandemic
+half-decade erased it almost entirely, though the sign of the 2020--2024
+average is dominated by the single large 2020 fall (UK: −0.88 years for
+females, −1.20 for males) and masks renewed gains in 2022--2024.
+
+# Why this deserves to stand alone
+
+Three reasons this figure is more than a supporting exhibit:
+
+- **It is legible without statistics.** The under- then over-projection
+  reversal is visible at a glance; no model is needed to see it.
+- **It reframes a live policy question.** "Are the official projections
+  believable?" has a different answer in each act. The most recent rounds
+  have swung to pessimism precisely when the underlying data are most
+  ambiguous (a genuine stall, or a pandemic interruption followed by
+  recovery?).
+- **It is a natural teaching case** in forecast evaluation: five decades of
+  a single institution's forecasts, scoreable against outturn, is rare.
+
+# Caveats
+
+- The final actual point (2024) is the projection base year and is
+  part-estimated.
+- Pre-2019 actuals use ONS single-year life tables
+  [@ons_single_year_lifetables]; 2019--2024 use the historic estimates
+  embedded in the 2024-based projection file, which differ from the older
+  series by up to ~0.17 years for Wales (population rebasing after the 2021
+  census).
+- "Actual" period life expectancy is itself a synthetic period measure, not
+  a cohort's realised lifespan.

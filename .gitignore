@@ -42,3 +42,5 @@ _book/
 
 **/*.quarto_ipynb
 figures/M02_reproduction_check.png
+spinoff/*.html
+spinoff/*_files/
