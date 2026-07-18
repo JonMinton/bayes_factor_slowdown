@@ -1,0 +1,789 @@
+---
+title: "Running to a standstill"
+subtitle: "A pre-pandemic Bayes-factor estimate of the UK life-expectancy slowdown, validated out-of-sample against 2020–2024"
+author: "Jon Minton"
+date: today
+bibliography: ../references.bib
+number-sections: true
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    code-fold: true
+    fig-cap-location: bottom
+    df-print: kable
+execute:
+  freeze: false
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+pacman::p_load(tidyverse, knitr, kableExtra)
+
+# Anchor all paths to the repository root, located by walking up from the
+# working directory until references.bib is found. This is robust to how
+# Quarto sets the execution directory under the manuscript/ project context.
+find_root <- function(start = getwd()) {
+  d <- normalizePath(start)
+  while (!file.exists(file.path(d, "references.bib")) && dirname(d) != d) d <- dirname(d)
+  d
+}
+ROOT <- find_root()
+rp <- function(...) file.path(ROOT, ...)
+
+# Corrected likelihood engine (dnorm-based get_ll and calc_bayes_factors).
+# See R/bayes_factors.R and the audit appendix audit/get_ll_fix_impact.qmd.
+source(rp("R", "bayes_factors.R"))
+
+populations <- c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")
+
+# Actual e0 to 2024. Values to 2018 are the ONS single-year life tables (as
+# used in the original paper); 2019-2024 are the historic estimates embedded in
+# the 2024-based NPP expectation-of-life files, because ONS no longer publishes
+# single-year life tables beyond 2020 (NOTES.md).
+dta_e0 <- read_csv(rp("data", "e0_from_ons_allnations_extended.csv"),
+                   show_col_types = FALSE) %>%
+  filter(population %in% populations)
+
+ch_e0_dta <- dta_e0 %>%
+  group_by(population, sex) %>%
+  arrange(year) %>%
+  mutate(ch_e0 = e0 - lag(e0)) %>%
+  ungroup() %>%
+  filter(!is.na(ch_e0))
+
+# --- Calibration window 1991-2010 (annual changes) --------------------------
+calib <- ch_e0_dta %>%
+  filter(between(year, 1991, 2010)) %>%
+  group_by(population, sex) %>%
+  summarise(mean_ch = mean(ch_e0), sd_ch = sd(ch_e0), .groups = "drop")
+
+uk_calib_f <- calib %>% filter(population == "United Kingdom", sex == "female") %>% pull(mean_ch)
+uk_calib_m <- calib %>% filter(population == "United Kingdom", sex == "male")   %>% pull(mean_ch)
+
+# --- Decade means (UK) ------------------------------------------------------
+uk_decades <- ch_e0_dta %>%
+  filter(population == "United Kingdom") %>%
+  mutate(dec = case_when(
+    between(year, 1981, 1990) ~ "1980s",
+    between(year, 1991, 2000) ~ "1990s",
+    between(year, 2001, 2010) ~ "2000s",
+    between(year, 2011, 2019) ~ "2011-19",
+    between(year, 2020, 2024) ~ "2020-24"
+  )) %>%
+  filter(!is.na(dec)) %>%
+  group_by(sex, dec) %>%
+  summarise(m = mean(ch_e0), .groups = "drop")
+
+uk_dec <- function(sx, d) uk_decades %>% filter(sex == sx, dec == d) %>% pull(m)
+
+# --- Three observation-window variants (corrected engine) -------------------
+variant_defs <- tibble::tribble(
+  ~variant,          ~after_first, ~after_last, ~drop_years,
+  "Pre-2020",        2011L,        2019L,       list(integer(0)),
+  "Full series",     2011L,        2024L,       list(integer(0)),
+  "COVID-excluded",  2011L,        2024L,       list(c(2020L, 2021L))
+)
+
+run_variant <- function(dta, after_first, after_last, drop_years) {
+  d <- dta %>% filter(!year %in% drop_years[[1]])
+  calc_bayes_factors(d, before_period = c(1991, 2010),
+                     after_period = c(after_first, after_last), outcome_var = ch_e0)
+}
+
+bf_all <-
+  ch_e0_dta %>%
+  select(-e0, -source) %>%
+  group_by(population, sex) %>%
+  nest() %>%
+  crossing(variant_defs) %>%
+  mutate(bayes_df = pmap(list(data, after_first, after_last, drop_years), run_variant)) %>%
+  select(population, sex, variant, bayes_df) %>%
+  unnest(cols = c(bayes_df)) %>%
+  ungroup() %>%
+  mutate(population = factor(population, levels = populations),
+         variant = factor(variant, levels = c("Pre-2020", "Full series", "COVID-excluded")))
+
+bf_argmax <-
+  bf_all %>%
+  group_by(population, sex, variant) %>%
+  slice_max(log_bf, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  transmute(population, sex, variant,
+            slowdown_pct = 100 * (1 - perc),
+            log10_bf = log_bf / log(10),
+            bf = bayes_factor,
+            mu_best = mu)
+
+# Reproduction of the original paper's 2011-2018 window.
+repro_1118 <-
+  ch_e0_dta %>%
+  filter(population == "United Kingdom") %>%
+  group_by(sex) %>%
+  nest() %>%
+  mutate(bf = map(data, ~calc_bayes_factors(.x, c(1991, 2010), c(2011, 2018), ch_e0))) %>%
+  select(sex, bf) %>% unnest(bf) %>%
+  group_by(sex) %>% slice_max(log_bf, n = 1, with_ties = FALSE) %>% ungroup() %>%
+  transmute(sex, slowdown_pct = round(100 * (1 - perc)))
+repro_f <- repro_1118 %>% filter(sex == "female") %>% pull(slowdown_pct)
+repro_m <- repro_1118 %>% filter(sex == "male")   %>% pull(slowdown_pct)
+
+# Corrected maximised BF magnitudes for the 2011-2018 audit window.
+bf18 <-
+  ch_e0_dta %>%
+  group_by(population, sex) %>% nest() %>%
+  mutate(bf = map(data, ~calc_bayes_factors(.x, c(1991, 2010), c(2011, 2018), ch_e0))) %>%
+  select(population, sex, bf) %>% unnest(bf) %>%
+  group_by(population, sex) %>% slice_max(log_bf, n = 1, with_ties = FALSE) %>% ungroup() %>%
+  transmute(population, sex, bf = bayes_factor)
+bf18_get <- function(pop, sx) bf18 %>% filter(population == pop, sex == sx) %>% pull(bf)
+
+# Headline (Pre-2020) and other UK variant values.
+uk_arg <- bf_argmax %>% filter(population == "United Kingdom")
+uk_val <- function(var, sx) round(uk_arg %>% filter(variant == var, sex == sx) %>% pull(slowdown_pct))
+hl_f  <- uk_val("Pre-2020", "female"); hl_m  <- uk_val("Pre-2020", "male")
+full_f <- uk_val("Full series", "female"); full_m <- uk_val("Full series", "male")
+cov_f  <- uk_val("COVID-excluded", "female"); cov_m <- uk_val("COVID-excluded", "male")
+
+# --- Out-of-sample validation ----------------------------------------------
+pre2020_implied <- bf_argmax %>% filter(variant == "Pre-2020") %>%
+  select(population, sex, implied_annual = mu_best)
+
+observed_2024 <- ch_e0_dta %>%
+  filter(between(year, 2020, 2024)) %>%
+  group_by(population, sex) %>%
+  summarise(obs_2020 = ch_e0[year == 2020],
+            obs_mean_2022_24 = mean(ch_e0[between(year, 2022, 2024)]),
+            obs_mean_2020_24 = mean(ch_e0), .groups = "drop")
+
+validation_table <- pre2020_implied %>%
+  left_join(observed_2024, by = c("population", "sex")) %>%
+  mutate(population = factor(population, levels = populations)) %>%
+  arrange(population, sex)
+
+uk_oos <- validation_table %>% filter(population == "United Kingdom")
+oos_g <- function(sx, col) uk_oos %>% filter(sex == sx) %>% pull({{ col }})
+
+# --- Bayes factor benchmark vs ONS projection rounds ------------------------
+ons_projections_tidied <- read_rds(rp("data", "ons_projections", "all_tidied_2012_2024.rds"))
+
+bf_benchmark <- pre2020_implied %>%
+  transmute(population = as.character(population), sex, bf_mu = implied_annual)
+
+ons_implied <-
+  ons_projections_tidied %>%
+  mutate(sex = case_when(sex == "f" ~ "female", sex == "m" ~ "male", TRUE ~ NA_character_)) %>%
+  filter(age == 0, year >= proj_year) %>%
+  group_by(country, sex, proj_year) %>%
+  arrange(year) %>%
+  mutate(ch_e0 = ex - lag(ex)) %>%
+  summarise(ons_mu = mean(ch_e0, na.rm = TRUE), .groups = "drop") %>%
+  mutate(country = ifelse(country == "UK", "United Kingdom", country)) %>%
+  rename(population = country, round = proj_year)
+
+combined_long <-
+  ons_implied %>%
+  mutate(population = as.character(population)) %>%
+  left_join(bf_benchmark, by = c("population", "sex")) %>%
+  mutate(population = factor(population, levels = populations)) %>%
+  arrange(population, sex, round)
+
+uk_cmp <- combined_long %>% filter(population == "United Kingdom")
+uk_get <- function(sx, rd) uk_cmp %>% filter(sex == sx, round == rd) %>% pull(ons_mu)
+bf_f <- bf_benchmark %>% filter(population == "United Kingdom", sex == "female") %>% pull(bf_mu)
+bf_m <- bf_benchmark %>% filter(population == "United Kingdom", sex == "male")   %>% pull(bf_mu)
+
+f2 <- function(x) formatC(x, format = "f", digits = 2)
+f3 <- function(x) formatC(x, format = "f", digits = 3)
+```
+
+# Abstract {.unnumbered}
+
+**Background.** The UK Office for National Statistics (ONS) revises its national
+life-expectancy projections every two years. Through the 2000s these
+projections repeatedly *under*-estimated improvement and were successively
+uprated; after period life expectancy at birth ($e_0$) stalled around 2010 they
+began to *over*-estimate improvement and were successively downrated. This paper
+introduces a continually-updatable Bayes-factor method for quantifying the
+post-2010 slowdown, estimates it on pre-pandemic data, and — in a substantial
+revision of the original 2019-vintage analysis — validates that estimate
+out-of-sample against the 2020–2024 outturn.
+
+**Objective.** To estimate how far UK $e_0$ improvement has fallen below its
+1991–2010 trend, to test whether a pre-pandemic estimate anticipates 2020–2024,
+and to reassess how optimistic successive ONS rounds have been.
+
+**Methods.** Period $e_0$ was taken from the Human Mortality Database (HMD) for
+international comparison and from the ONS for UK nations. For each population we
+compared the likelihood of the observed post-2010 annual $e_0$ changes under a
+family of proportional-slowdown scenarios (0–100% of the 1991–2010 mean gain)
+against a no-slowdown null, using Bayes factors [@kass1995bayes] computed from a
+Normal-iid likelihood. The likelihood engine was corrected for an
+operator-precedence error present in the original drafts (see audit). The
+headline estimate uses a pre-pandemic observation window (2011–2019); the
+2020–2024 years are held out for out-of-sample validation. Window sensitivity
+is reported transparently.
+
+**Results.** A breakpoint near 2010 is confirmed for the UK and all constituent
+nations except Northern Ireland. The pre-pandemic window puts the UK slowdown at
+about `r hl_f`% (females) and `r hl_m`% (males) of the earlier improvement rate;
+restricting to 2011–2018 reproduces the original paper's ~61%/61% exactly, the
+difference being the strong 2019 recovery year. With the corrected likelihood
+the evidence for a slowdown is **stronger for males than females** (UK males
+Bayes factor ≈ `r f2(bf18_get("United Kingdom","male"))`, "strong"; females ≈
+`r f2(bf18_get("United Kingdom","female"))`, "positive"). Out-of-sample, the
+2020 pandemic shock lies far outside the model, but 2022–2024 improvement
+returned to about the reduced rate the pre-2020 data already implied. The newest
+ONS rounds (2020-, 2022-, 2024-based) sit close to the pre-pandemic benchmark
+rather than far below it: the sharp downward revision happened over 2012–2018
+and has since stabilised.
+
+**Conclusion.** The stalling in UK $e_0$ improvement after 2010 was real and
+roughly halved the earlier rate, but the post-pandemic recovery weakens any
+"stalling has only worsened" narrative, and the most recent ONS assumptions are
+broadly in line with — not markedly more pessimistic than — the pre-pandemic
+evidence. The Bayes-factor method provides a transparent, rapidly-updatable
+interim estimate between biennial ONS releases.
+
+# Introduction
+
+Every couple of years the UK's ONS produces new national population projections,
+including new assumptions about mortality and longevity. Such projections,
+whether carried out by national statistical bodies or by private insurers, are
+vital inputs to a wide range of decisions for the effective provision of state
+services and assets, including schools, and social and healthcare needs at UK,
+national and local levels.
+
+Up until 2010, ONS forecasts of life-expectancy gains consistently
+underestimated rates of improvement, and the assumptions were successively
+uprated and made more optimistic in successive revisions [@ons_npp_accuracy].
+Since 2010, however, the life-expectancy improvement assumptions made by the ONS
+have proven too optimistic, and were then successively made more pessimistic for
+several revisions in a row.
+
+In parallel with the ONS' attempts to project life-expectancy trends, academic
+demographers and commercial actuaries have also made predictions. A number of
+approaches have been tried. The most technically sophisticated forecast the
+individual components of life expectancy — mortality rates at individual ages —
+and derive life expectancies from estimated life tables [@lee1992modeling], make
+use of Bayesian methods for smoothing observations from neighbouring years and
+age groups, and/or incorporate cohort effects allowing faster or slower gains in
+some cohorts than others. An important UK example was the identification of a
+so-called "Golden Cohort", persons born roughly between 1925 and 1945, whose
+rates of mortality improvement appeared systematically higher than for earlier
+or later cohorts, and which constituted a substantial source of "longevity risk"
+for both private and state pensions.
+
+Perhaps surprisingly, more complex approaches to demographic forecasting have
+not been found to reliably outperform simpler approaches, and a very simple
+approach to forecasting life expectancy, which does not involve forecasting
+mortality at individual ages, has also been found to be effective
+[@white2002longevity]. This approach simply assumes that life-expectancy
+improvements will tend to continue linearly on average over the long term. This
+assumption seems to hold more for the average of many similar populations, or
+for the best-performing of a collection of high-income nations
+[@oeppen2002broken], than for any single population [@lee2019mortality], but has
+the dual advantages of simplicity and of allowing uncertainty intervals to be
+generated from the observed variation in annual changes using well-established
+time-series methods. This linear-trend view of life expectancy is the conceptual
+starting point of the present paper.
+
+Since around 2014, worsening trends in life-expectancy improvement have been an
+increasing area of focus and concern in the UK among public-health researchers
+and academics. Much of the surrounding commentary has focused on the role of
+UK-government austerity policies and corresponding changes in the funding and
+provision of out-of-work benefits and social and healthcare services; analyses
+by others have instead emphasised the multifactorial nature of the slowdown and
+the roles of influenza and slowing cardiovascular-disease improvement in
+particular [@murphy2019stalling].
+
+This paper focuses on how ONS mortality projections have changed over this period
+of stalling UK life expectancy, and on how new annual data can be better used to
+inform assumptions about future trajectories. We introduce a complementary
+approach to evaluating and updating beliefs about how substantial and persistent
+the post-2010 stalling has been, which uses Bayes factors [@kass1995bayes] to
+compare the likelihood of the observed post-2010 improvements under continued
+pre-2010 trends against a family of slowdown scenarios. The approach allows quick
+updating of beliefs whenever a new annual life-expectancy estimate is released,
+so that interim projections can be produced in the years between the biennial
+ONS releases.
+
+This is a **substantially revised analysis**. Relative to the original
+2019-vintage draft it (i) extends the observed $e_0$ series from 2018 to 2024;
+(ii) corrects an operator-precedence error in the likelihood engine that had
+attenuated every reported Bayes factor toward 1 (see @sec-methods and the audit
+appendix); and (iii) reframes the study around **forecast validation** — a
+headline estimated on pre-pandemic data (to 2019) whose implied future
+improvement rate is then validated out-of-sample against 2020–2024, years the
+original analysis could not see. This reframing is prompted by two findings the
+extended data force upon us: the pre-pandemic estimate is sensitive to whether
+the window ends in 2018 or 2019, and the 2020 pandemic year is not an ordinary
+draw from the pre-pandemic process.
+
+The rest of the paper proceeds as follows. We first place the UK slowdown in
+international context (@sec-intl). We then examine UK-nation $e_0$ trends and
+locate the breakpoint (@sec-uk). We present five decades of ONS projections
+against observed $e_0$ (@sec-projns). We then give the Bayes-factor estimate of
+the slowdown with transparent window sensitivity (@sec-bf), validate the
+pre-pandemic estimate out-of-sample (@sec-oos), and compare the estimate against
+every ONS round from 2012 to 2024 (@sec-bfons). A discussion (@sec-discussion)
+synthesises and sets out limitations.
+
+# Methods {#sec-methods}
+
+The Human Mortality Database (HMD) is a joint initiative of the Max Planck
+Institute for Demographic Research, the University of California, Berkeley, and
+INED (Paris), providing detailed mortality and population data produced under a
+standard methodology for many populations [@hmd]. Period life expectancy at
+birth ($e_0$) was extracted from the HMD to allow comparison between the UK and
+other high-income nations, and from the ONS to allow comparison within UK
+nations and groups.
+
+Annual change in $e_0$ was computed across European and Anglophone nations to
+assess the extent to which a slowdown in improvement is seen internationally, and
+within UK nations to assess how similar the trends are within the UK. For UK
+nations, changepoint analysis was performed using the `segmented`
+[@muggeo2008segmented] and `changepoint` [@killick2014changepoint] R packages to
+assess whether the slowdown is contemporaneous, which would suggest common
+exposure. ONS projections from 2012 onwards are shown to demonstrate the extent
+of the slowdown assumed by each biennial round.
+
+**Actual $e_0$ series.** Values to 2018 are the ONS single-year life tables, as
+used in the original paper [@ons_single_year_lifetables]. Because the ONS no
+longer publishes single-year life tables beyond 2020, values for 2019–2024 are
+taken from the historic estimates embedded in the 2024-based National Population
+Projections (NPP) expectation-of-life files [@ons_expectation_of_life]. Over the
+37 overlapping years (1982–2018) the two sources agree to within about 0.01
+years on average, with the notable exception of Wales, which disagrees by up to
+0.17 years (see @sec-discussion). The final actual point (2024) is the NPP
+projection base year (mid-2024) and is therefore part-estimated.
+
+**Bayes-factor definition.** For each population and sex we model annual $e_0$
+change as independent Normal draws. Calibrating on the annual changes for
+1991–2010 (i.e. $e_0$ *levels* 1990–2010) gives a mean $\hat\mu$ and variance
+$\hat\sigma^2$. We then define a family of 101 proportional-slowdown scenarios,
+each with mean $\mu = p\,\hat\mu$ for $p$ running from 1 (no slowdown) down to 0
+(100% slowdown), sharing the calibration variance. For an observation window of
+post-2010 annual changes $x$, the Bayes factor of a scenario against the
+no-slowdown null is the likelihood ratio
+
+$$
+\mathrm{BF}(p) \;=\; \frac{\prod_i \phi\!\big(x_i;\, p\hat\mu,\, \hat\sigma^2\big)}
+                          {\prod_i \phi\!\big(x_i;\, \hat\mu,\, \hat\sigma^2\big)},
+$$
+
+where $\phi$ is the Normal density. A value above 1 favours a slowdown over
+no-slowdown; we report the scenario that maximises $\mathrm{BF}(p)$ and interpret
+magnitudes on the @kass1995bayes scale. Because corrected Bayes factors can
+overflow `exp()` for long windows, magnitudes are reported on a
+$\log_{10}$ scale where convenient.
+
+**Corrected likelihood.** The likelihood function in the original drafts
+contained an operator-precedence error: the term intended as `1 / (2 * sig_sq)`
+was written `(1 / 2 * sig_sq)`, which R evaluates as `0.5 * sig_sq`. Because the
+first two terms of the Normal log-likelihood cancel in any likelihood ratio, the
+Bayes factor is affected only through the quadratic term, giving
+$\log\mathrm{BF}_{\text{legacy}} = \sigma^4 \log\mathrm{BF}_{\text{correct}}$.
+As $\sigma$ for annual $e_0$ change is roughly 0.1–0.25 years, this attenuated
+every reported Bayes factor toward 1 by three to four orders of magnitude,
+which is why the original manuscript reported values indistinguishable from 1.
+The BF-*maximising* slowdown percentage is a monotone transform of the sum of
+squares and is therefore **unaffected** by the fix; only the magnitudes change.
+The corrected engine (`R/bayes_factors.R`) uses `dnorm`; the fix and its impact
+on the original 2011–2018 findings are quantified in the audit appendix
+(`audit/get_ll_fix_impact.qmd`).
+
+**Pre-2020 headline and out-of-sample design.** The 2020–2021 pandemic years are
+plainly not ordinary draws from the pre-pandemic process, and even 2019 already
+showed a recovery in improvement. We therefore treat a pre-pandemic observation
+window (2011–2019) as the headline, and hold out 2020–2024 as an out-of-sample
+test of the improvement rate that headline implies. For transparency we also
+report a full series (2011–2024) and a COVID-excluded series (2011–2024 dropping
+2020–2021), and do not privilege any single number without stating the others.
+
+# Results 1: International context {#sec-intl}
+
+Slowdowns in $e_0$ gain have been observed in a number of high-income nations in
+recent years, but have been more severe in the UK than in almost all other
+high-income nations except the USA. @fig-intl arranges HMD nations by their
+average annual improvement in the 2010s. The nations with the fastest recent
+improvement are Russia and Eastern European countries (e.g. Belarus, Ukraine,
+Russia, Lithuania, Poland), while the slowest gains are seen in the USA, Iceland,
+the UK, the Netherlands and Germany. In general, nations with the worst changes
+in the 1980s and 1990s have tended to see the fastest improvement in the 2010s,
+and vice versa. Notably, average improvement rates in Germany and the UK in the
+2010s are within about 0.01 years/year of one another.
+
+```{r}
+#| label: fig-intl
+#| fig-cap: "Average annual change in period life expectancy at birth by decade across HMD high-income nations, arranged by average gain in the 2010s. Source: Human Mortality Database. (Figure regenerated in the 2026 refactor; see analysis/01_international_trends.qmd.)"
+knitr::include_graphics(rp("bayes_paper", "figures", "A01_intl_mean_ch_e0_by_decade.png"))
+```
+
+A closer comparison of the slowest-improving high-income nations (the USA, the
+UK, the Netherlands and Germany) is shown in @fig-intl-selected.
+
+```{r}
+#| label: fig-intl-selected
+#| fig-cap: "Annual change in period life expectancy at birth for selected slow-improving high-income nations. Source: Human Mortality Database."
+knitr::include_graphics(rp("bayes_paper", "figures", "A02_selected_high_income.png"))
+```
+
+[TODO: the full 38-nation decade table (original Table R1.1) is not reproduced
+here; the international decade values above are read from the regenerated HMD
+figures. If a numeric table is wanted in the final manuscript, regenerate it to
+the latest HMD vintage from `analysis/01_international_trends.qmd` rather than
+copying the original draft's values, whose HMD extract ended around 2016.]
+
+# Results 2: UK trends and the breakpoint {#sec-uk}
+
+For the UK as a whole and all constituent nations except Northern Ireland, the
+2000s saw faster improvement than the 1980s and 1990s, followed by a marked
+slowdown in the 2010s. In the UK, improvement has been higher each decade for
+males than for females. @tbl-uk-decades gives the UK decade means computed from
+the extended ONS series.
+
+```{r}
+#| label: tbl-uk-decades
+#| tbl-cap: "Mean annual change in UK period life expectancy at birth (years/year) by sex and period, from the extended ONS series. The 2020-24 mean is dominated by the single large 2020 fall (see text)."
+uk_decades %>%
+  mutate(m = round(m, 3)) %>%
+  pivot_wider(names_from = dec, values_from = m) %>%
+  rename(Sex = sex) %>%
+  select(Sex, `1980s`, `1990s`, `2000s`, `2011-19`, `2020-24`) %>%
+  kbl() %>% kable_styling(full_width = FALSE)
+```
+
+The UK 2010s improvement (`r f3(uk_dec("female","2011-19"))` years/year for
+females, `r f3(uk_dec("male","2011-19"))` for males) is roughly half the
+1991–2010 calibration mean (`r f3(uk_calib_f)` female, `r f3(uk_calib_m)` male).
+As shown in the annual series (@fig-uk-annual), the low 2010s average is not
+driven by any single "bad year" but is part of a continuing trend; single years
+in which $e_0$ fell are not in themselves exceptional, but a combination of
+faster falls in bad years and lower gains in good years drives the slowdown.
+Male and female trends within a nation tend to be more strongly correlated with
+the same sex in other nations than with the opposite sex in the same nation, the
+coupling being strongest in England and Wales and weakest in Northern Ireland.
+
+```{r}
+#| label: fig-uk-bar
+#| fig-cap: "Average annual change in period life expectancy at birth in the UK and constituent nations, by sex and decade. Source: ONS."
+knitr::include_graphics(rp("bayes_paper", "figures", "M01_ch_e0_uk_nations_barchart.png"))
+```
+
+```{r}
+#| label: fig-uk-annual
+#| fig-cap: "Annual change in period life expectancy at birth, UK and constituent nations, by sex. Source: ONS."
+knitr::include_graphics(rp("bayes_paper", "figures", "A03_Annual_ch_uk_nations.png"))
+```
+
+To confirm that the 2010s represent a distinct break from previous trends,
+breakpoint analysis was performed using segmented regression
+[@muggeo2008segmented; @killick2014changepoint]. For the UK as a whole and all
+constituent nations except Northern Ireland, a breakpoint in the series was
+identified within one year of 2010 (@fig-breakpoint); for Northern Ireland a
+breakpoint was instead identified in the mid-1980s. The contemporaneity of the
+break across UK nations is consistent with a common exposure around 2010, broadly
+consistent with previously published research on the UK stalling
+[@murphy2019stalling].
+
+```{r}
+#| label: fig-breakpoint
+#| fig-cap: "Segmented-regression breakpoints in annual life-expectancy change, UK and constituent nations. A break within one year of 2010 is found for all populations except Northern Ireland. Source: ONS."
+knitr::include_graphics(rp("bayes_paper", "figures", "A10_brk_uk_nations.png"))
+```
+
+# Results 3: ONS projections against observed $e_0$ {#sec-projns}
+
+@fig-fan shows ONS $e_0$ projection rounds from 1971 to 2024 against observed
+$e_0$ (black). The picture is a three-act story of forecast error: successive
+rounds *under*-predicted the $e_0$ actually achieved up until around 2010; from
+2012 onwards the projections began instead to *over*-predict, with the 2008–2016
+rounds now sitting well above observation; and the 2020-, 2022- and 2024-based
+rounds start from the post-COVID level and are far more pessimistic in level than
+anything before them, even as 2022–2024 show a partial recovery. This
+self-contained figure is developed further as a standalone note
+(`spinoff/forecasting_note.qmd`, "Fifty years of forecasting UK life
+expectancy").
+
+```{r}
+#| label: fig-fan
+#| fig-cap: "ONS UK life-expectancy projection rounds, 1971–2024 (coloured; darker = older rounds), against observed period life expectancy at birth (black). Each coloured line is one projection vintage extrapolating forward from its base year. The final actual point (2024) is the 2024-based NPP base year and is part-estimated. Source: ONS NPP accuracy report (1971–2012 rounds) and expectation-of-life datasets (2014–2024 rounds)."
+knitr::include_graphics(rp("bayes_paper", "figures", "M02_ons_lt_projns_updated.png"))
+```
+
+The differences in projection *shape* reflect a range of methods: some early
+projections are straight lines (consistent with simple linear $e_0$
+extrapolation), whereas later projections are curved, reflecting assumptions
+about age-specific mortality risks. Historically, projections built up from
+age-specific rates have tended to underestimate achieved gains in high-income
+countries. @tbl-ons-assumed reports the mean long-term annual $e_0$ improvement
+assumed by each round from 2012 onwards. Even the 2012 round assumed rates below
+the observed 1980s–2000s rates, so may have been considered conservative at the
+time; each successive biennial round to 2018 assumed slower improvement than the
+last. The extension of the table to the 2020-, 2022- and 2024-based rounds is
+discussed in @sec-bfons, where it is set against the Bayes-factor benchmark.
+
+```{r}
+#| label: tbl-ons-assumed
+#| tbl-cap: "Mean implied long-term annual e0 gain (years/year) by ONS projection round, UK. Computed from the projection period-e0 series in each round. Source: ONS expectation-of-life datasets 2012-2024 rounds."
+uk_cmp %>%
+  transmute(Round = round, Sex = sex, `Implied gain` = round(ons_mu, 3)) %>%
+  pivot_wider(names_from = Sex, values_from = `Implied gain`) %>%
+  arrange(Round) %>%
+  kbl() %>% kable_styling(full_width = FALSE)
+```
+
+# Results 4: Bayes-factor estimate of the slowdown {#sec-bf}
+
+This section quantifies how far post-2010 UK improvement has fallen short of the
+1991–2010 trend, using the Bayes-factor method of @sec-methods. For each
+population and sex we identify the proportional-slowdown scenario that maximises
+the Bayes factor against the no-slowdown null, and report the strength of
+evidence at that maximum. @fig-bf-schedules shows the $\log_{10}$ Bayes-factor
+schedules for the pre-pandemic headline window.
+
+```{r}
+#| label: fig-bf-schedules
+#| fig-cap: "Bayes-factor schedules (log10 BF against proposed percentage slowdown) for the pre-pandemic 2011-2019 window, by population and sex. Values above zero favour a slowdown over no slowdown."
+knitr::include_graphics(rp("figures", "A12_Bayes_Factor_Schedules_2024.png"))
+```
+
+**Corrected magnitudes.** With the likelihood bug fixed, the maximised Bayes
+factors are far larger than the ~1.00 values of the original drafts, while the
+maximising percentages are unchanged. On the 2011–2018 window that reproduces the
+original analysis, UK males reach a Bayes factor of about
+`r f2(bf18_get("United Kingdom","male"))` and England males about
+`r f2(bf18_get("England","male"))` — "strong" evidence on the @kass1995bayes
+scale — whereas the corresponding females reach about
+`r f2(bf18_get("United Kingdom","female"))` (UK) and
+`r f2(bf18_get("England","female"))` (England), i.e. "positive" evidence, and
+Northern Ireland males remain genuinely equivocal
+(`r f2(bf18_get("Northern Ireland","male"))`). This **inverts the emphasis of
+the original draft**: the evidence for a slowdown is stronger for males than for
+females, because female annual $e_0$ changes are noisier relative to their
+smaller mean improvement (@sec-methods), so a given shortfall is harder to
+distinguish from noise for females. The original draft's suggestion that the ONS
+remained too optimistic *mainly* for females rested partly on the attenuated
+magnitudes and does not survive the correction.
+
+**Window sensitivity.** @tbl-bf-maximise gives, for every population and sex, the
+BF-maximising slowdown percentage and its $\log_{10}$ Bayes factor under the
+three observation-window variants.
+
+```{r}
+#| label: tbl-bf-maximise
+#| tbl-cap: "BF-maximising slowdown (% below the 1991-2010 mean improvement) and log10 Bayes factor at that maximum, by observation-window variant. Pre-2020 is the headline; Full series and COVID-excluded are shown for transparency."
+bf_argmax %>%
+  mutate(cell = paste0(round(slowdown_pct), "% (", f2(log10_bf), ")")) %>%
+  select(Population = population, Sex = sex, variant, cell) %>%
+  pivot_wider(names_from = variant, values_from = cell) %>%
+  arrange(Population, Sex) %>%
+  kbl() %>%
+  kable_styling(full_width = FALSE) %>%
+  add_header_above(c(" " = 2, "Slowdown % (log10 BF)" = 3))
+```
+
+Restricting the observation window to the pre-pandemic **2011–2018** span exactly
+reproduces the original paper's headline — a `r repro_f`% slowdown for UK females
+and `r repro_m`% for UK males, matching the original Table 4 — confirming that
+the corrected engine and 2024-extended data recover the published result.
+Extending the pre-pandemic window by the single further year **2019** — a strong
+recovery year (UK $e_0$ rose 0.29 years for females and 0.24 for males, both
+above the 1991–2010 mean) — already pulls the estimate down to **`r hl_f`%
+(females) and `r hl_m`% (males)**. The original paper's headline was therefore,
+unknowingly, sensitive to ending in 2018; 2019 already hinted at recovery before
+COVID.
+
+Reading across the variants for the UK reveals a genuine three-way tension. The
+pre-pandemic headline points to roughly `r hl_f`%/`r hl_m`% (female/male). The
+**full series to 2024 inflates this to `r full_f`%/`r full_m`%**, but that
+inflation is driven almost entirely by the 2020 shock (UK $e_0$ fell 0.88 years
+for females and 1.20 for males in 2020), which a Normal-iid likelihood wrongly
+treats as an ordinary draw. Conversely, **excluding 2020–2021 pulls the estimate
+down to `r cov_f`%/`r cov_m`%** — but this is not a clean "no slowdown" reading
+either: it is pulled *up* by the genuine 2022–2024 recovery, which the original
+2019-vintage analysis could not see. No single number is unambiguous; the
+pre-pandemic headline plus explicit out-of-sample validation (@sec-oos) is the
+most honest framing.
+
+# Results 5: Out-of-sample validation {#sec-oos}
+
+The pre-pandemic (2011–2019) window is, in effect, a forecast: it implies, for
+each population and sex, a best-supported mean annual $e_0$ gain equal to the
+1991–2010 mean multiplied by the BF-maximising proportion. Because 2020–2024 were
+not used to fit it, they provide a genuine out-of-sample test of that forecast.
+@tbl-oos sets the pre-2020-implied gain against what was actually observed, and
+@fig-oos shows the observed 2020–2024 annual changes against the pre-pandemic
+best forecast.
+
+```{r}
+#| label: tbl-oos
+#| tbl-cap: "Out-of-sample validation: pre-pandemic (2011-2019) best-supported annual e0 gain (years/year) versus observed 2020-2024 changes. The 2024 actual is part-estimated (2024-based NPP base year)."
+validation_table %>%
+  transmute(Population = population, Sex = sex,
+            `Pre-2020 implied` = round(implied_annual, 3),
+            `Observed 2020` = round(obs_2020, 3),
+            `Observed mean 2022-24` = round(obs_mean_2022_24, 3),
+            `Observed mean 2020-24` = round(obs_mean_2020_24, 3)) %>%
+  kbl() %>% kable_styling(full_width = FALSE)
+```
+
+```{r}
+#| label: fig-oos
+#| fig-cap: "Observed 2020-2024 annual e0 change (bars) against the mean annual gain implied by the pre-pandemic 2011-2019 BF-maximising scenario (dashed line), by population and sex. The 2024 actual is part-estimated."
+knitr::include_graphics(rp("figures", "A14_out_of_sample_validation_2024.png"))
+```
+
+The out-of-sample picture is dominated by two offsetting features. The **2020
+shock** is far outside anything the pre-pandemic model contemplated (UK:
+`r f3(oos_g("female","obs_2020"))` years for females,
+`r f3(oos_g("male","obs_2020"))` for males). But the **2022–2024 recovery** is
+real and substantial: over 2022–2024 the UK averaged
+`r f3(oos_g("female","obs_mean_2022_24"))` years/year for females and
+`r f3(oos_g("male","obs_mean_2022_24"))` for males, both at or above the
+pre-pandemic best-supported gains of `r f3(oos_g("female","implied_annual"))`
+(female) and `r f3(oos_g("male","implied_annual"))` (male). Averaged across the
+whole 2020–2024 window the shock and recovery partly cancel (UK mean
+`r f3(oos_g("female","obs_mean_2020_24"))` female,
+`r f3(oos_g("male","obs_mean_2020_24"))` male). The substantive message is that
+the recovery materially weakens any naive "the stalling has only worsened"
+narrative: post-pandemic improvement has returned to roughly the
+reduced-but-positive rate the pre-2020 data already implied, rather than
+collapsing further. This is the single most important substantive update since
+the original analysis.
+
+# Results 6: Comparison with ONS assumptions {#sec-bfons}
+
+Finally we set the pre-pandemic Bayes-factor benchmark — the single
+best-supported mean annual gain per population and sex — against the mean annual
+$e_0$ improvement implied by each ONS projection round from 2012 to 2024
+[@ons_expectation_of_life]. Anchoring the comparison on the pre-pandemic window
+(rather than a series including the COVID shock) keeps it clean: the ONS rounds
+are themselves projections of a smoothly improving process. @tbl-bfons and
+@fig-bfons give the comparison for the UK.
+
+```{r}
+#| label: tbl-bfons
+#| tbl-cap: "Mean implied annual e0 gain (years/year) by ONS round versus the fixed pre-pandemic Bayes-factor benchmark, UK. A round below the benchmark projected slower improvement than the pre-2020 data implied (relatively pessimistic); above it, relatively optimistic."
+uk_cmp %>%
+  transmute(Round = round, Sex = sex,
+            ONS = round(ons_mu, 3), `BF (pre-2020)` = round(bf_mu, 3)) %>%
+  pivot_wider(names_from = Sex, values_from = c(ONS, `BF (pre-2020)`)) %>%
+  select(Round, ONS_female, `BF (pre-2020)_female`, ONS_male, `BF (pre-2020)_male`) %>%
+  arrange(Round) %>%
+  kbl(col.names = c("Round", "ONS", "BF (pre-2020)", "ONS", "BF (pre-2020)")) %>%
+  kable_styling(full_width = FALSE) %>%
+  add_header_above(c(" " = 1, "Female" = 2, "Male" = 2))
+```
+
+```{r}
+#| label: fig-bfons
+#| fig-cap: "ONS-implied annual e0 gain by projection round (2012-2024) against the fixed pre-pandemic Bayes-factor benchmark, UK. The Bayes-factor benchmark is constant because it is the single pre-pandemic best estimate."
+knitr::include_graphics(rp("bayes_paper", "figures", "M03_ons_cf_bayes_2024.png"))
+```
+
+Reading down the UK block, the ONS rounds tracked steadily downwards from 2012,
+reflecting the accumulating evidence of stalling: for UK females the implied gain
+fell from `r f3(uk_get("female", 2012))` years/year (2012 round) toward the
+pre-pandemic benchmark of `r f3(bf_f)`, and for males from
+`r f3(uk_get("male", 2012))` toward `r f3(bf_m)`.
+
+The key new finding is that **the newest rounds have stabilised close to the
+pre-2020 benchmark rather than continuing far below it**. For UK females the
+2020-, 2022- and 2024-based rounds imply `r f3(uk_get("female", 2020))`,
+`r f3(uk_get("female", 2022))` and `r f3(uk_get("female", 2024))` years/year
+respectively — all at or slightly *above* the benchmark of `r f3(bf_f)`. For UK
+males the same rounds imply `r f3(uk_get("male", 2020))`,
+`r f3(uk_get("male", 2022))` and `r f3(uk_get("male", 2024))`, straddling the
+benchmark of `r f3(bf_m)`. The sharp downward revision therefore happened over
+the 2012–2018 rounds and has since levelled off; the fan figure's apparent
+"sharp pessimism" of the newest rounds (@fig-fan) is about the post-COVID
+starting *level*, not the assumed *rate* of future gain. Combined with the
+corrected finding that the slowdown evidence is stronger for males than females
+(@sec-bf), the original draft's characterisation that the ONS "may still be
+underestimating the stalling, especially for females" no longer holds for the
+latest rounds: they are broadly in line with, not markedly more pessimistic
+than, the pre-pandemic evidence.
+
+# Discussion {#sec-discussion}
+
+This paper set out to quantify the post-2010 slowdown in UK life-expectancy
+improvement using a transparent, continually-updatable Bayes-factor method, and —
+in a substantial revision of the original analysis — to test a pre-pandemic
+estimate against the 2020–2024 outturn.
+
+The central findings are threefold. First, the stalling around 2010 was real: a
+breakpoint within a year of 2010 is confirmed for the UK and all constituent
+nations except Northern Ireland, and the pre-pandemic Bayes-factor estimate puts
+the UK slowdown at roughly `r hl_f`% (females) to `r hl_m`% (males) of the
+earlier improvement rate, reproducing the original ~61% exactly for the
+2011–2018 sub-window. Second, this headline is genuinely window-sensitive: the
+strong 2019 recovery year lowers it by around ten points, the 2020 shock inflates
+the full-series estimate, and excluding the pandemic years lowers it again — so
+no single point estimate is clean, and the honest presentation is the full set of
+windows plus out-of-sample validation. Third, the 2022–2024 recovery, invisible
+to the original 2019-vintage analysis, has returned improvement to about the
+reduced-but-positive rate the pre-2020 data already implied; and the newest ONS
+rounds have stabilised close to that same benchmark. Together these weaken a
+naive "the stalling has only worsened" narrative and soften the original policy
+implication.
+
+The **correction of the likelihood bug** does not change any maximising slowdown
+percentage — those are monotone in the sum of squares — but it restores
+meaningful evidence magnitudes and, in doing so, reverses the original draft's
+sex emphasis. The evidence for a slowdown is stronger for males (UK/England
+males reaching "strong" evidence on the @kass1995bayes scale) than for females
+("positive"), because female annual changes are noisier relative to their smaller
+mean gain. Any previously circulated numbers quoting Bayes-factor *magnitudes*
+should be treated as superseded by the corrected values reported here and in the
+audit appendix; the qualitative conclusions of the original work stand.
+
+**Value of the method.** The Bayes-factor schedule can be recomputed within
+minutes of each annual ONS release, providing a transparent interim estimate of
+the underlying improvement rate in the years between the biennial NPP rounds. A
+commitment to publish an updated schedule on each release — made *before* the
+data are seen — would make the process of updating beliefs about the slowdown
+formal rather than informal, and would give researchers and policymakers a
+shared "ground truth" around which to reason even where they disagree about
+causes.
+
+**Limitations.** Several caveats bound the conclusions. (i) The Normal-iid
+likelihood treats every annual change as an exchangeable draw, which the 2020
+pandemic year plainly is not; we address this pragmatically by holding the
+pandemic years out of the headline and reporting window sensitivity, rather than
+by modelling a level shift or outlier explicitly — a natural extension. (ii) The
+outcome is *period* life expectancy at birth, a synthetic cross-sectional
+measure, not the realised lifespan of any cohort; period $e_0$ is more sensitive
+to transient shocks such as influenza seasons and the pandemic. (iii) Multiple
+populations, both sexes and several windows were examined, so individual
+"strong-evidence" cells should be read in the context of the family of tests
+rather than as isolated confirmatory results. (iv) The actual $e_0$ series
+splices two ONS sources; these agree closely except for **Wales**, where the
+single-year life tables and the NPP-embedded historic estimates disagree by up
+to ~0.17 years, likely because of population-estimate revisions following the
+2021 census — so the Welsh estimates in particular should be treated with
+caution. (v) The final actual point (2024) is the NPP projection base year and is
+part-estimated. (vi) The calibration and comparison rest on a single
+pre-slowdown window (1991–2010); the qualitative picture is robust, but the exact
+percentages depend on that choice.
+
+**Policy reading.** The original work concluded that the most recent ONS forecast
+still appeared too optimistic and underestimated the UK slowdown. The extended,
+corrected analysis qualifies this. The slowdown was real and roughly halved the
+earlier improvement rate, and the UK's experience remains severe relative to
+other high-income nations; but the post-pandemic recovery and the stabilisation
+of the newest ONS rounds mean that, for the latest vintages, the ONS assumptions
+are broadly consistent with the pre-pandemic evidence rather than clearly too
+optimistic. Whether the modest 2022–2024 recovery is sustained — and whether the
+underlying drivers of the post-2010 stall have been addressed — remains an open
+question that the continually-updatable Bayes-factor method is well suited to
+track as each new year of data arrives.
+
+# References {.unnumbered}
