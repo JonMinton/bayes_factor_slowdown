@@ -1,0 +1,30 @@
+project:
+  type: book
+  output-dir: _book
+
+book:
+  title: "Running to a standstill"
+  subtitle: "How responsive have successive ONS life expectancy forecasts been to stalling life expectancy gains?"
+  author: "Jon Minton"
+  chapters:
+    - index.qmd
+    - analysis/01_international_trends.qmd
+    - analysis/02_uk_trends.qmd
+    - analysis/03_ons_projections.qmd
+    - analysis/04_bayes_factors.qmd
+    - analysis/05_bf_vs_ons.qmd
+  appendices:
+    - audit/get_ll_fix_impact.qmd
+
+bibliography: references.bib
+
+execute:
+  freeze: auto
+  warning: false
+  message: false
+
+format:
+  html:
+    theme: cosmo
+    code-fold: true
+    toc: true

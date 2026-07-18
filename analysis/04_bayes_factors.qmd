@@ -1,0 +1,209 @@
+# Bayes factors for slowdown scenarios
+
+```{r}
+#| label: setup
+#| echo: false
+#| warning: false
+#| message: false
+pacman::p_load(tidyverse, here, readxl, knitr, kableExtra, ggrepel)
+
+source(here::here("scripts", "load_packages_and_functions.R"))
+
+write_to_table <- function(x, loc){
+  write_csv(x, loc)
+  x
+}
+
+dta_e0 <- read_csv(here("data", "e0_from_ons_allnations.csv"))
+```
+
+This chapter calculates Bayes factors [@kass1995bayes] for $e_0$ changes since 2010, assuming different rates of slowdown expressed as a percentage of the average prior (1991–2010) rate of change. The Bayes factor compares the likelihood of the observed post-2010 annual changes in life expectancy under a proposed slowdown scenario against their likelihood under the null scenario of no change from pre-2010 improvement rates: values above 1 indicate support for the slowdown scenario over the no-change scenario.
+
+::: {.callout-note}
+## Known bug in the likelihood function
+
+The likelihood function `get_ll` in `scripts/load_packages_and_functions.R`, on which the Bayes factor calculations below depend, contains a known operator-precedence bug: the term intended as `1 / (2 * sig_sq)` is written `(1 / 2 * sig_sq)`, which R parses as `0.5 * sig_sq`. The bug is deliberately **not** fixed in this chapter, so that the restructured analysis reproduces the legacy numbers exactly. It is documented in `NOTES.md` and is fixed — with an audit of its impact on the results — in a subsequent commit.
+:::
+
+Now, let's determine the average change (and SD) from 1991 to 2010.
+
+```{r}
+#| label: fig-mean-sd-preslowdown
+#| warning: false
+dta_e0 %>%
+  group_by(population, sex) %>%
+  arrange(year) %>%
+  mutate(ch_e0 = e0 - lag(e0)) %>%
+  ungroup() %>%
+  filter(!is.na(ch_e0)) %>%
+  filter(between(year, 1991, 2010)) %>%
+  select(-e0) %>%
+  group_by(population, sex) %>%
+  arrange(year) %>%
+  summarise(
+    mean_ch = mean(ch_e0),
+    sd_ch   = sd(ch_e0)
+  ) %>%
+  write_to_table(here("data", "mean_sd_ch_preslowdown_ons.csv")) %>%
+  mutate(mean_ch = mean_ch * 52.25, sd_ch = sd_ch * 52.25) %>%
+  ggplot(aes(x = mean_ch, y = sd_ch, shape = sex, colour = sex)) +
+  geom_point() +
+  geom_text_repel(aes(label = population, colour = sex), show.legend = FALSE) +
+  labs(
+    x = "Mean annual change in life expectancy in weeks",
+    y = "Standard deviation in annual change in life expectancy in weeks",
+    title = "Mean and standard deviation of change in life expectancy\nfrom 1991 to 2010 by UK population",
+    caption = "Source: ONS Single Year Lifetables"
+  )
+
+ggsave(here("figures", "mean_sd_preslowdown_improvement_ons.png"), height = 20, width = 20, units = "cm", dpi = 300)
+```
+
+For each of these populations, we can estimate the relative likelihood of observing the observed life expectancies from 2011 onwards under the assumption that each population's fundamentals of life expectancy improvement had not changed after 2010. This assumption is questionable for Northern Ireland because of its changepoint in the mid 1980s, but will be applied to this population too for consistency with the other populations.
+
+```{r}
+#| label: calc-bayes-factors
+#| warning: false
+bf_uk_nations <-
+  dta_e0 %>%
+    group_by(population, sex) %>%
+    arrange(year) %>%
+    mutate(ch_e0 = e0 - lag(e0)) %>%
+    ungroup() %>%
+    filter(!is.na(ch_e0)) %>%
+    select(-e0) %>%
+    group_by(population, sex) %>%
+    arrange(year) %>%
+    nest() %>%
+    crossing(after_end = 2011:2018) %>%
+    mutate(
+      bayes_df = map2(
+        after_end, data, ~calc_bayes_factors(after_period = c(2011, .x), before_period = c(1991, 2010), outcome_var = ch_e0, dta = .y)
+      )
+    ) %>%
+    select(population, sex, after_end, bayes_df) %>%
+    unnest(cols = c(bayes_df)) %>%
+    mutate(
+      period = paste0("2011-", str_sub(after_end, 3,4))
+    )
+
+bf_uk_nations
+
+bf_mutexc <- bf_uk_nations %>%
+  filter(population %in% c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")) %>%
+  mutate(population = factor(population, levels = c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")))
+```
+
+```{r}
+#| label: fig-bf-schedules
+#| fig-width: 12
+#| fig-height: 12
+#| warning: false
+bf_mutexc %>%
+  mutate(perc = 100 * perc) %>%
+  mutate(
+    population = fct_relevel(population, c("United Kingdom",  "England", "Scotland", "Wales", "Northern Ireland"))
+  ) %>%
+  ggplot(aes(x = perc, y = bayes_factor, alpha = period)) +
+  geom_line() +
+  geom_line(aes(x = perc, y = bayes_factor), size = 1.4,
+              data = bf_mutexc %>%
+                filter(period == "2011-18") %>%
+                mutate(perc = 100 * perc) %>%
+                mutate(
+    population = fct_relevel(population, c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"))
+  ) %>%
+                mutate(is_pos = bayes_factor > 1),
+              inherit.aes = FALSE
+            ) +
+  facet_wrap(population ~ sex, scales = "free_y") +
+  geom_ribbon(aes(
+      ymin = ifelse(is_pos, 1, bayes_factor),
+      ymax = ifelse(is_pos, bayes_factor, 1),
+      x = perc, group = paste0(is_pos, period),
+      fill = is_pos
+    ),
+              data = bf_mutexc %>%
+                mutate(perc = 100 * perc) %>%
+                  mutate(
+              population = fct_relevel(population, c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"))
+            ) %>%
+                mutate(is_pos = bayes_factor > 1),
+              inherit.aes = FALSE, alpha = 0.2) +
+  scale_alpha_discrete("Period", range = c(0.2, 1), breaks = c("2011-11", "2011-12", "2011-13", "2011-14", "2011-15", "2011-16", "2011-17", "2011-18")) +
+  geom_hline(yintercept = 1) +
+  labs(
+    x = "Percentage of previous improvement",
+    y = "Bayes Factor\n(>1 means support for Alternative Hypothesis",
+    title = "Bayes Factor for various proposed levels of slowdown",
+    subtitle = "Based on all series up to 2011-18"
+  ) +
+  guides(fill = FALSE) +
+  scale_x_continuous(breaks = seq(0, 100, by = 10))
+
+ggsave(here("figures", "bayes_factor_various_proposed_slowdown_levels.png"), height = 12, width = 12, units = "in", dpi = 300)
+
+ggsave(here("bayes_paper", "figures", "A12_Bayes_Factor_Schedules.png"), height = 25, width = 30, units = "cm", dpi = 300)
+```
+
+For all populations except males in Northern Ireland, the addition of the 2018 single year life expectancy data led to sizeable increases in the empirical support for the belief that there has been a slowdown in life expectancy after 2010; this is seen by noting how much higher the bold line, which incorporates the 2018 data, is than the fainter lines representing cumulative data based on shorter series of observations. For most of these populations, the peak of the bold line is to the left of peaks based on earlier series, meaning not only did the 2018 observations increase the strength of evidence supporting belief in a slowdown in life expectancy improvements, but also suggested more severe magnitudes of slowdown than the series excluding this most recent observation had indicated. For the UK as a whole, the addition of the life expectancy data for 2018 suggested an overall slowdown of around 60% was most likely, compared with a most likely magnitude of slowdown of around 50% based on data up to 2017.
+
+For each of these populations, what does the Bayes Factor maximise at?
+
+```{r}
+#| label: fig-pct-decline
+#| echo: true
+#| warning: false
+bf_mutexc %>%
+   filter(period == "2011-18") %>%
+   mutate(perc = 100 * perc) %>%
+   mutate(
+    population = factor(population, levels = c("United Kingdom",  "England", "Scotland", "Wales", "Northern Ireland"))
+  ) %>%
+  group_by(sex, population) %>%
+  filter(bayes_factor == max(bayes_factor)) %>%
+  ungroup() %>%
+  ggplot(aes(y = population, x = 100 - perc, shape = sex, colour = sex)) +
+  geom_point() +
+  geom_text(aes(label = 100 -perc), nudge_y = 0.2) +
+  labs(
+    x = "Percentage decline from 1991-2010 levels",
+    y = "Population",
+    title = "Estimated percentage slowdown",
+    subtitle = "Decline over 2011-2018 compared with 1991-2010",
+    caption = "Source: ONS Single Year Lifetables"
+  ) +
+  lims(x = c(0, 100)) +
+  geom_vline(xintercept = 0)
+
+ggsave(here("bayes_paper", "figures", "A13_pct_decline_2011_18_cf_1991_2011.png"), height = 15, width = 25, units = "cm", dpi =300)
+```
+
+The following table shows, for each population, sex and observation period, the percentage slowdown at which the Bayes factor is maximised, alongside the Bayes factor at that maximum.
+
+```{r}
+#| label: tbl-bf-maximise
+#| warning: false
+table_wide <-
+  bf_mutexc %>%
+    group_by(population, sex, period) %>%
+    filter(bayes_factor == max(bayes_factor)) %>%
+    filter(period != "2011-11") %>%
+    mutate(perc = 100 * (1 - perc)) %>%
+    select(Population = population, Sex = sex, period, perc, bayes_factor) %>%
+    mutate(perc_bf = paste0(perc,"% (BF: ", formatC(round(bayes_factor, 5), format = 'f', digits = 5), ")")) %>%
+    select(Population, Sex, period, perc_bf) %>%
+    spread(period, perc_bf)
+
+table_wide %>%
+  kable() %>%
+  kable_styling()
+```
+
+In the UK as a whole, it is most likely that life expectancy improvement rates have slowed down by 62% for females, and 59% for males. This is made up of a 60% (females) and 59% (males) slowdown in England, a 72% (females) and 56% (males) slowdown in Scotland, a 59% (females) and 29% (males) slowdown in Northern Ireland, and an estimated 77% (females) and 83% (males) slowdown in Wales. With the exception of males in Northern Ireland, rates of slowdown are therefore similar across UK nations, and generally slightly more severe for females than males.
+
+Some important points:
+
+* This approach means that the process of updating beliefs about the extent and evidence for a slowdown in life expectancy gains can be made formally rather than informally.
+* The Bayes Factor schedules can be recalculated whenever a new data release becomes available. This means that updated schedules can be produced within minutes of the release of official statistics. The commitment to do this each each new release, and to publish updated estimates of support for slowdown, should be made before such data are released.
+* The tendency within UK populations has been for the rate of slowdown to be increasing over time, rather than to shift suddenly from one rate to another. If this continues then the proposed slowdown percentage that maximises the bayes factor will continue to shift further to the left with additional years' data, and could be maximised at a negative value (i.e. declining life expectancy rather than slowing improvement) if this tendency continues.

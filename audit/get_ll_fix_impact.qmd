@@ -1,0 +1,203 @@
+# Audit: impact of the `get_ll` precedence fix {.unnumbered}
+
+::: {.callout-important}
+Internal audit document. This report quantifies the effect of correcting an
+operator-precedence error in the legacy likelihood function on the Bayes
+factor results reported in the 2020 manuscript drafts ("Running to a
+standstill"). It exists so that any circulated or submitted numbers can be
+traced and, where necessary, corrected.
+:::
+
+## The defect
+
+The legacy log-likelihood (`scripts/load_packages_and_functions.R`, line 13,
+preserved on branch `old/pre-refactor`) was written:
+
+```r
+- n * log(sig) - (n/2) * log(2 * pi) - (1 / 2 * sig_sq) * sum((x - mu)^2)
+```
+
+R parses `(1 / 2 * sig_sq)` as $\frac{1}{2}\sigma^2$, whereas the normal
+log-likelihood requires $\frac{1}{2\sigma^2}$. The first two terms are
+scenario-invariant and cancel in any likelihood ratio, so the Bayes factor
+is affected only through the quadratic term:
+
+$$
+\log \mathrm{BF}_{\text{legacy}}
+ = \frac{\sigma^2}{2}\left(S_0 - S_\mu\right), \qquad
+\log \mathrm{BF}_{\text{correct}}
+ = \frac{1}{2\sigma^2}\left(S_0 - S_\mu\right),
+$$
+
+where $S_\mu = \sum_i (x_i - \mu)^2$. Hence
+
+$$
+\log \mathrm{BF}_{\text{legacy}} = \sigma^4 \, \log \mathrm{BF}_{\text{correct}}.
+$$
+
+Two consequences follow immediately, before any recomputation:
+
+1. **The scenario that maximises the BF is unchanged** --- both versions are
+   strictly increasing transformations of $S_0 - S_\mu$ --- so every
+   "slowdown of x% is most likely" statement in the manuscript is
+   unaffected.
+2. **Every reported BF magnitude is wrong.** The standard deviation of
+   annual $e_0$ change is roughly 0.1--0.25 years across UK populations, so
+   $\sigma^4 \approx 10^{-4}$--$10^{-3}$: legacy log-BFs are three to four
+   orders of magnitude too small, which is why the manuscript's Table 4
+   reports values such as "61% (BF: 1.00135)" --- BFs indistinguishable
+   from 1 despite eight years of accumulated evidence.
+
+## Recomputation on the original data window
+
+Both versions are re-run below on exactly the manuscript's setup: actual
+$e_0$ from the ONS single-year life tables (`data/e0_from_ons_allnations.csv`,
+1980--2018), calibration on annual changes 1991--2010, observation windows
+2011--2011 through 2011--2018, scenarios 0--100% slowdown in 1% steps.
+
+```{r}
+#| label: recompute
+pacman::p_load(tidyverse, here, knitr)
+source(here("R", "bayes_factors.R"))
+
+dta_e0 <- read_csv(here("data", "e0_from_ons_allnations.csv"),
+                   show_col_types = FALSE)
+
+populations <- c("United Kingdom", "England", "Scotland", "Wales",
+                 "Northern Ireland")
+
+ch_data <- dta_e0 %>%
+  filter(population %in% populations) %>%
+  group_by(population, sex) %>%
+  arrange(year) %>%
+  mutate(ch_e0 = e0 - lag(e0)) %>%
+  ungroup() %>%
+  filter(!is.na(ch_e0))
+
+run_both <- function(dta, after_end) {
+  bind_rows(
+    calc_bayes_factors(dta, c(1991, 2010), c(2011, after_end), ch_e0,
+                       ll_fun = get_ll_legacy) %>%
+      mutate(version = "legacy"),
+    calc_bayes_factors(dta, c(1991, 2010), c(2011, after_end), ch_e0,
+                       ll_fun = get_ll) %>%
+      mutate(version = "corrected")
+  )
+}
+
+bf_both <- ch_data %>%
+  group_by(population, sex) %>%
+  nest() %>%
+  crossing(after_end = 2011:2018) %>%
+  mutate(bf = map2(data, after_end, run_both)) %>%
+  select(population, sex, after_end, bf) %>%
+  unnest(bf)
+```
+
+### Does the maximising scenario ever differ?
+
+```{r}
+#| label: argmax-check
+argmax_tbl <- bf_both %>%
+  group_by(population, sex, after_end, version) %>%
+  slice_max(log_bf, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  select(population, sex, after_end, version, perc) %>%
+  pivot_wider(names_from = version, values_from = perc)
+
+stopifnot(all(argmax_tbl$legacy == argmax_tbl$corrected))
+n_cells <- nrow(argmax_tbl)
+```
+
+Across all `r n_cells` population-sex-window combinations the BF-maximising
+slowdown percentage is **identical** under the legacy and corrected
+likelihoods, confirming the algebraic argument above.
+
+### Corrected magnitudes for the full 2011--2018 window
+
+```{r}
+#| label: headline-table
+headline <- bf_both %>%
+  filter(after_end == 2018) %>%
+  group_by(population, sex, version) %>%
+  slice_max(log_bf, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  transmute(population, sex, version,
+            slowdown_pct = 100 * (1 - perc),
+            bf = bayes_factor, log10_bf = log_bf / log(10)) %>%
+  pivot_wider(names_from = version, values_from = c(bf, log10_bf)) %>%
+  select(population, sex, slowdown_pct,
+         bf_legacy, bf_corrected, log10_bf_corrected) %>%
+  arrange(match(population, populations), sex)
+
+headline %>%
+  kable(
+    digits = c(0, 0, 0, 5, 1, 1),
+    col.names = c("Population", "Sex", "BF-maximising slowdown (%)",
+                  "BF (legacy, as reported)", "BF (corrected)",
+                  "log10 BF (corrected)"),
+    caption = "Maximised Bayes factors, 2011-2018 window, legacy vs corrected likelihood."
+  )
+```
+
+The legacy column reproduces the manuscript's Table 4 values (e.g. UK "61%
+(BF: 1.001...)"), and the maximising percentages match Table 4 exactly
+(61% UK both sexes; 59%/73% Scotland m/f; 83%/73% Wales m/f; 15% Northern
+Ireland males), confirming provenance. The corrected column is what should
+have been reported. On the @kass1995bayes scale the correction moves males
+in the UK and England from "not worth more than a bare mention" (an
+artefact of the bug) to "strong" evidence for a slowdown
+($\mathrm{BF} \approx 70$--$100$), females to "positive" evidence
+($\mathrm{BF} \approx 2$--$4$), while Northern Ireland males remain
+genuinely equivocal ($\mathrm{BF} \approx 1.1$). Notably, under the
+corrected likelihood the evidence for a slowdown is *stronger for males
+than females* --- the draft manuscript's suggestion that ONS projections
+"may still be underestimating the stalling for females" rested partly on
+the attenuated magnitudes and deserves re-examination in the update.
+
+### Evidence accumulation, corrected
+
+```{r}
+#| label: fig-accumulation
+#| fig-width: 8
+#| fig-height: 5
+bf_both %>%
+  filter(population == "United Kingdom") %>%
+  group_by(sex, after_end, version) %>%
+  slice_max(log_bf, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  ggplot(aes(x = after_end, y = log_bf / log(10),
+             colour = sex, linetype = version)) +
+  geom_line() +
+  geom_point() +
+  labs(
+    x = "Final year of observation window (from 2011)",
+    y = "log10 Bayes factor at maximising scenario",
+    title = "United Kingdom: maximised Bayes factor as evidence accumulates",
+    subtitle = "Legacy values are visually indistinguishable from zero at this scale"
+  )
+```
+
+## Affected outputs
+
+| Output | Status |
+|---|---|
+| Manuscript Table 4 (`bayes_paper/tables/M04_bf_nochange.xlsx`, `bf_nochange.xlsx`) | BF magnitudes wrong; maximising percentages correct |
+| Manuscript Table 5 (`bayes_paper/tables/M05_bf_cf_ons_projections.xlsx`) | BF magnitudes wrong; implied-slowdown percentages correct |
+| Figure `A12_Bayes_Factor_Schedules.png` | y-axis values wrong (shape and argmax correct) |
+| Figures `M03_ons_cf_bayes.png`, `bayes_factor_2018_update.png`, `bayes_factor_various_proposed_slowdown_levels.png` | as above where BF values are shown |
+| Abstract / results prose quoting BF values | wrong wherever a BF magnitude is quoted; "most likely slowdown" percentages unaffected |
+
+## Recommendations
+
+1. If any version of the manuscript containing BF magnitudes was submitted,
+   circulated, or cited, issue a correction note alongside any reissue;
+   the qualitative conclusions (existence and approximate magnitude of the
+   slowdown) stand.
+2. All updated analyses (2011--2024 windows) use the corrected `get_ll`
+   from `R/bayes_factors.R`; report `log10 BF` rather than raw BF, since
+   corrected BFs overflow `exp()` for long windows.
+3. A minor prose inconsistency found during this audit: the manuscript
+   describes the calibration window variously as "1990 to 2010" and
+   "1991-2010"; the code uses annual changes for years 1991--2010 (i.e.
+   $e_0$ levels 1990--2010). Standardise on the code's definition.

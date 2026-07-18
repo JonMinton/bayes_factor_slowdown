@@ -1,0 +1,459 @@
+# ONS life expectancy projections
+
+The ONS modifies their estimates of life expectancy every couple of years as part of their population projections exercise. For the last four projections the life expectancy projections have been downgraded. This chapter shows how projections have changed over time, and how they compare against observed life expectancy.
+
+This chapter works with the 2012-, 2014-, 2016- and 2018-based projection rounds, as in the original analysis. (The newer 2020-, 2022- and 2024-based rounds are introduced separately; see the note on the updated fan figure below.)
+
+```{r}
+#| label: setup
+#| include: false
+pacman::p_load(
+  tidyverse,
+  readxl,
+  here,
+  knitr,
+  kableExtra,
+  glue,
+  patchwork
+)
+```
+
+## Data
+
+The projected period life expectancies come from the ONS *Expectation of life, principal projection* datasets [@ons_expectation_of_life], published separately for each UK nation and for the UK as a whole. For each of the five populations (United Kingdom, England, Scotland, Wales, Northern Ireland), the 2012-, 2014-, 2016- and 2018-based principal projection workbooks were downloaded from the ONS website; the raw `.xls` files are committed under `data/ons_projections/` (one subdirectory per nation, `proj_<round>.xls`). The "Males period ex" and "Females period ex" sheets of each workbook were then read, reshaped to long format (country, sex, projection round, age, year, $e_x$), combined, and saved as `data/ons_projections/all_tidied.rds`. The download-and-tidy code is preserved in the legacy notebook (`markdown/bayes_factor_ons_e0.Rmd`); here we simply load the tidied result.
+
+```{r}
+#| label: load-tidied-projections
+ons_projections_tidied <- read_rds(here("data", "ons_projections", "all_tidied.rds"))
+
+ons_projections_tidied
+```
+
+We also need observed (actual) period life expectancies at birth for the UK nations, taken from the ONS single year life tables [@ons_single_year_lifetables] and tidied earlier in this project.
+
+```{r}
+#| label: load-actual-e0
+dta_e0 <- read_csv(here("data", "e0_from_ons_allnations.csv"))
+```
+
+## Older projections
+
+There was a report showing how pre-2012 ONS projections compared [@ons_npp_accuracy]. Let's get the data and visualise too.
+
+The underlying data is available [here](https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationprojections/adhocs/006372nationalpopulationprojectionsaccuracyreportunderlyingdatauk1966to2030), and the link to the excel file itself is [here](https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/populationandmigration/populationprojections/adhocs/006372nationalpopulationprojectionsaccuracyreportunderlyingdatauk1966to2030/eolsforfigures12and13nppaccuracyreport.xls). A copy is committed at `data/ons_projections/historic_comparison.xls`.
+
+The data requires a bit of tidying...
+
+```{r}
+#| label: build-older-projns
+older_projns <-
+  bind_rows(
+    # males
+    read_excel(path = here("data", "ons_projections", "historic_comparison.xls"), sheet = "Data", range = "A2:BO26") %>%
+      slice(-1) %>%
+      select(-1) %>%
+      rename(projection = ...2) %>%
+      gather(-projection, key = "year", value = "e0") %>%
+      filter(!is.na(e0)) %>%
+      mutate(sex = "male") %>%
+      select(sex, projection, year, e0),
+    # females
+    read_excel(path = here("data", "ons_projections", "historic_comparison.xls"), sheet = "Data", range = "A30:BO54") %>%
+      slice(-1) %>%
+      select(-1) %>%
+      rename(projection = ...2) %>%
+      gather(-projection, key = "year", value = "e0") %>%
+      filter(!is.na(e0)) %>%
+      mutate(sex = "female") %>%
+      select(sex, projection, year, e0)
+  ) %>%
+  mutate(year = as.numeric(year)) %>%
+  bind_rows( # more recent data
+    dta_e0 %>%
+      filter(population == "United Kingdom") %>%
+      filter(year > 2012) %>%
+      mutate(projection = "Actual") %>%
+      select(sex, projection, year, e0)
+  )
+
+older_projns
+```
+
+Visualise.
+
+```{r}
+#| label: fig-older-projns
+#| fig-width: 10
+#| fig-height: 6
+older_projns %>%
+  filter(projection != "Actual") %>%
+  ggplot(aes(x = year, y = e0, group = projection, colour = projection)) +
+  geom_line() +
+  facet_wrap(~sex) +
+  geom_line(aes(x = year, y = e0), size = 1.2, inherit.aes = FALSE, data = older_projns %>% filter(projection == "Actual")) +
+  labs(x = "Year", y = "Life expectancy at birth in years", title = "Life expectancy projections, 1971-2012")
+```
+
+To this, let's add the more recent projections.
+
+```{r}
+#| label: fig-projns-fan-1971-2018
+#| fig-width: 10
+#| fig-height: 8
+older_projns %>%
+  filter(projection != "Actual") %>%
+  bind_rows(
+    ons_projections_tidied %>%
+      filter(age == 0) %>%
+      filter(year >= 2010) %>%
+      mutate(proj_year = factor(proj_year)) %>%
+      mutate(sex = case_when(
+        sex == 'm'   ~ 'male',
+        sex == 'f'   ~ 'female',
+        TRUE         ~ NA_character_
+      )) %>%
+      filter(country == "UK") %>%
+      select(sex, projection = proj_year, year, e0 = ex) %>%
+      mutate(projection = as.character(projection) %>% paste(., "proj")) %>%
+      filter(projection != "2012 proj")
+  ) %>%
+  filter(year <= 2040) %>%
+  ggplot(aes(x = year, y = e0, group = projection, colour = projection)) +
+  geom_line() +
+  facet_wrap(~sex) +
+  geom_line(aes(x = year, y = e0), size = 1.2, inherit.aes = FALSE, data = older_projns %>% filter(projection == "Actual")) +
+  labs(x = "Year", y = "Life expectancy at birth in years", title = "Life expectancy projections, 1971-2018")
+
+# The original notebook saved this figure to bayes_paper/figures/M02_ons_lt_projns.png.
+# That published artifact must stay byte-identical to the committed version, so this
+# reproduction is saved to a different path instead of overwriting it.
+ggsave(here("figures", "M02_reproduction_check.png"), height = 20, width = 25, units = "cm", dpi = 300)
+```
+
+An updated version of this figure, extending the fan with the 2020-, 2022- and 2024-based projection rounds and actual $e_0$ through 2024, is produced by `scripts/update_ons_projections_figure.R` and shown below.
+
+```{r}
+#| label: fig-projns-fan-updated
+#| echo: false
+knitr::include_graphics(here("bayes_paper", "figures", "M02_ons_lt_projns_updated.png"))
+```
+
+## Visualise projections
+
+### Change in projections
+
+How do the projections ($e_0$ at birth) change over time between countries?
+
+```{r}
+#| label: fig-recent-projns-uk-nations
+#| fig-width: 10
+#| fig-height: 10
+ons_projections_tidied %>%
+  filter(age == 0) %>%
+  filter(year >= 2010) %>%
+  mutate(proj_year = factor(proj_year)) %>%
+  mutate(sex = case_when(
+    sex == 'm'   ~ 'male',
+    sex == 'f'   ~ 'female',
+    TRUE         ~ NA_character_
+  )) %>%
+  mutate(country = factor(country, levels = c("UK", "England", "Scotland", "Wales", "Northern Ireland"))) %>%
+  ggplot(aes(x = year, y = ex, group = proj_year, colour = proj_year)) +
+  facet_grid(country ~ sex) +
+  geom_line() +
+  labs(
+    x = "Year", y = "Life expectancy at birth (years)",
+    title = "ONS projections for life expectancy at birth",
+    colour = "ONS Projection\nYear"
+  )
+
+ggsave(here("figures", "ons_life_expectancy_projections.png"), height = 25, width = 25, units = "cm", dpi = 300)
+ggsave(here("bayes_paper", "figures", "A06_recentONSprojns_uknations.png"), height = 25, width = 25, units = "cm", dpi = 300)
+```
+
+### Change in projections - annual increases
+
+For each of these projections, what's the implied expected improvement level?
+
+```{r}
+#| label: fig-projns-annual-increases
+#| fig-width: 10
+#| fig-height: 10
+ons_projections_tidied %>%
+  filter(age == 0) %>%
+  filter(year >= 2019) %>%
+  mutate(sex = case_when(
+    sex == 'm'   ~ 'male',
+    sex == 'f'   ~ 'female',
+    TRUE         ~ NA_character_
+  )) %>%
+  group_by(sex, country, proj_year) %>%
+  arrange(year) %>%
+  mutate(ch_e0 = ex - lag(ex)) %>%
+  filter(!is.na(ch_e0)) %>%
+  ungroup() %>%
+  mutate(country = factor(country, levels = c("UK", "England", "Scotland", "Wales", "Northern Ireland"))) %>%
+  ggplot(aes(x = year, y = ch_e0, group = factor(proj_year), colour = factor(proj_year), shape = factor(proj_year))) +
+  geom_point() + geom_line() +
+  facet_grid(country ~ sex) +
+  geom_hline(yintercept = 0) +
+  labs(
+    x = "Year", y = "Change in Life expectancy at birth (years)",
+    title = "ONS projections for annual life expectancy change at birth",
+    colour = "ONS Projection\nYear",
+    shape = "ONS Projection\nYear"
+  )
+
+ggsave(here("figures", "ons_life_expectancy_projections_change.png"), height = 25, width = 25, units = "cm", dpi = 300)
+ggsave(here("bayes_paper", "figures", "A07_recentch_e0_ONSprojns_uknations.png"), height = 25, width = 25, units = "cm", dpi = 300)
+```
+
+So, the projections involve adding varying numbers of increments of 0.1 life expectancy gain per year. Values within these intervals are created by changing the numbers of years of 0.2, 0.1 and 0.0 gain.
+
+### Projections at all ages
+
+```{r}
+#| label: build-ex-heatmap-male
+ex_projns_male <-
+  ons_projections_tidied %>%
+    filter(sex == "m") %>%
+    mutate(country = factor(country, levels = c("UK", "England", "Scotland", "Wales", "Northern Ireland"))) %>%
+    mutate(proj_year = factor(proj_year)) %>%
+    ggplot(aes(x = year, y = age, fill = ex)) +
+    geom_tile() +
+    scale_fill_viridis_c() +
+    coord_fixed() +
+    facet_grid(country ~ proj_year) +
+    labs(
+      x = "Year", y = "Age in years",
+      title = "Males"
+    )
+```
+
+```{r}
+#| label: build-ex-heatmap-female
+ex_projns_female <-
+  ons_projections_tidied %>%
+    filter(sex == "f") %>%
+    mutate(country = factor(country, levels = c("UK", "England", "Scotland", "Wales", "Northern Ireland"))) %>%
+    mutate(proj_year = factor(proj_year)) %>%
+    ggplot(aes(x = year, y = age, fill = ex)) +
+    geom_tile() +
+    scale_fill_viridis_c() +
+    coord_fixed() +
+    facet_grid(country ~ proj_year) +
+    labs(
+      x = "Year", y = "Age in years",
+      title = "Females"
+    )
+```
+
+```{r}
+#| label: fig-ex-heatmap
+#| fig-width: 13.5
+#| fig-height: 10.5
+# The original notebook combined the two panels with ggpubr::ggarrange(); ggpubr is
+# not available in this environment, so patchwork is used to produce the same
+# side-by-side arrangement.
+ex_projns_male + ex_projns_female
+
+ggsave(here("bayes_paper", "figures", "A08_ons_ex_heatmap.png"), width = 35, height = 27, units = "cm", dpi = 300)
+```
+
+### Change in projections at all ages
+
+```{r}
+#| label: build-ch-ex-heatmaps
+ch_proj_male <-
+  ons_projections_tidied %>%
+    group_by(country, sex, age, year) %>%
+    arrange(proj_year) %>%
+    mutate(ch_ex_proj = ex - lag(ex)) %>%
+    filter(!is.na(ch_ex_proj)) %>%
+    ungroup() %>%
+    mutate(country = factor(country, levels = c("UK", "England", "Scotland", "Wales", "Northern Ireland"))) %>%
+    filter(year >= 2020) %>%
+    filter(sex == "m") %>%
+    ggplot(aes(x = year, age, fill = ch_ex_proj)) +
+    geom_tile() +
+    coord_fixed() +
+    facet_grid(country ~ proj_year) +
+    scale_fill_distiller(palette = "RdBu", limits = c(-1.5, 1.5)) +
+    labs(
+      x = "Year", y = "Age in years", fill = "Change in ex",
+      title = "Males, change from last projection"
+    ) +
+    theme(axis.text.x = element_text(angle = 90))
+
+ch_proj_female <-
+  ons_projections_tidied %>%
+    group_by(country, sex, age, year) %>%
+    arrange(proj_year) %>%
+    mutate(ch_ex_proj = ex - lag(ex)) %>%
+    filter(!is.na(ch_ex_proj)) %>%
+    ungroup() %>%
+    mutate(country = factor(country, levels = c("UK", "England", "Scotland", "Wales", "Northern Ireland"))) %>%
+    filter(year >= 2020) %>%
+    filter(sex == "f") %>%
+    ggplot(aes(x = year, age, fill = ch_ex_proj)) +
+    geom_tile() +
+    coord_fixed() +
+    facet_grid(country ~ proj_year) +
+    scale_fill_distiller(palette = "RdBu", limits = c(-1.5, 1.5)) +
+    labs(
+      x = "Year", y = "Age in years", fill = "Change in ex",
+      title = "Females, change from last projection"
+    ) +
+    theme(axis.text.x = element_text(angle = 90))
+```
+
+And as a 2x1 table.
+
+```{r}
+#| label: fig-ch-ex-heatmap
+#| fig-width: 10
+#| fig-height: 10.5
+# ggpubr::ggarrange() replaced with the equivalent patchwork arrangement (see above).
+ch_proj_male + ch_proj_female
+
+ggsave(here("bayes_paper", "figures", "A09_ons_ch_ex_heatmap.png"), width = 25, height = 27, units = "cm", dpi = 300)
+```
+
+## Summaries
+
+### Average projected improvement
+
+Let's summarise this:
+
+```{r}
+#| label: summarise-projections
+ons_projections_summarised <-
+  ons_projections_tidied %>%
+    filter(age == 0) %>%
+    filter(year >= 2019) %>%
+    group_by(sex, country, proj_year) %>%
+    arrange(year) %>%
+    mutate(ch_e0 = ex - lag(ex)) %>%
+    summarise(
+      mean_ch_e0 = mean(ch_e0, na.rm = TRUE),
+      sd_ch_e0   = sd(ch_e0, na.rm = TRUE)
+    )
+
+ons_projections_summarised
+```
+
+As a wide table, mean (SD) of projected annual $e_0$ gain by nation, sex and projection round. (The original notebook also wrote this table to a styled Excel workbook, `bayes_paper/tables/M03_ons_proj_improvements_sd.xlsx`; that formatting code has been dropped here.)
+
+```{r}
+#| label: tbl-proj-improvements
+table_wide <-
+  ons_projections_summarised %>%
+    ungroup() %>%
+    mutate(Sex = case_when(
+      sex == 'f'    ~ 'Female',
+      sex == 'm'    ~ 'Male',
+      TRUE          ~ NA_character_
+    )) %>%
+    rename(Country = country) %>%
+    mutate(Country = ifelse(Country == "UK", "United Kingdom", Country)) %>%
+    mutate(Country = factor(Country, levels = c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"))) %>%
+    unite(Sex, proj_year, col = "sex_proj") %>%
+    select(Country, sex_proj, mean_ch_e0, sd_ch_e0) %>%
+    mutate(text = glue::glue("{format(mean_ch_e0, digits=2)} ({format(sd_ch_e0, digits=2)})")) %>%
+    select(Country, sex_proj, text) %>%
+    spread(sex_proj, text) %>%
+    set_names(c("Country", rep(c("2012", "2014", "2016", "2018"), 2)))
+
+table_wide %>%
+  kable() %>%
+  kable_styling() %>%
+  add_header_above(c(" " = 1, "Female" = 4, "Male" = 4))
+```
+
+At this point let's compare the ONS projections against the historic values observed since 1990.
+
+| sex | decade | HMD   | ONS   |
+|-----|--------|-------|-------|
+| f   | 80s    | 0.168 | 0.168 |
+| f   | 90s    | 0.168 | 0.170 |
+| f   | 00s    | 0.244 | 0.241 |
+| f   | 10s    | 0.091 | 0.080 |
+| m   | 80s    | 0.229 | 0.230 |
+| m   | 90s    | 0.229 | 0.232 |
+| m   | 00s    | 0.319 | 0.313 |
+| m   | 10s    | 0.164 | 0.131 |
+
+| sex | 2012  | 2014  | 2016  | 2018  |
+|-----|-------|-------|-------|-------|
+| f   | 0.137 | 0.129 | 0.115 | 0.094 |
+| m   | 0.148 | 0.147 | 0.134 | 0.114 |
+
+So, the projections have all assumed that the rates of improvement observed in the 2000s are not sustainable in the long term, but have been downrated by around a third from 2012 to 2018 for females, and by around a fifth from 2012 to 2018 for males. Assumed rates of improvement are around 17.5% higher than observed in the 2010s for females, and around 13% higher than observed in the 2010s for males.
+
+To put more simply: the 2012 ONS projection assumed the rate of improvement would be the midpoint between the 1990 and 2010-11 rates, and subsequent projections have tended increasingly towards the post-2010 improvement levels. They have largely been responsive to the new and much slowed life expectancy gains.
+
+The before period used in the Bayes Factor calculations is 1991 onwards. Let's identify what the average improvement was over this period.
+
+```{r}
+#| label: tbl-uk-gain-1991-2010
+dta_e0 %>%
+  filter(population == "United Kingdom") %>%
+  filter(between(year, 1990, 2010)) %>%
+  group_by(sex) %>%
+  arrange(year) %>%
+  mutate(ch_e0 = e0 - lag(e0)) %>%
+  filter(!is.na(ch_e0)) %>%
+  summarise(mean_ch_e0 = mean(ch_e0), var_ch_e0 = var(ch_e0)) %>%
+  kable(digits = 3) %>%
+  kable_styling()
+```
+
+This checks out with what was calculated before. (Phew!)
+
+The same summary for all UK nations, with SD instead of variance. (The original notebook wrote this to a styled Excel workbook, `bayes_paper/tables/A04_avg_gain_uknations_1991_2010.xlsx`; that formatting code has been dropped here.)
+
+```{r}
+#| label: tbl-gains-1991-2010-all-nations
+table_1991_2010_gains <-
+  dta_e0 %>%
+    filter(between(year, 1990, 2010)) %>%
+    mutate(Country = factor(population, levels = c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"))) %>%
+    filter(!is.na(Country)) %>%
+    rename(Sex = sex) %>%
+    group_by(Country, Sex) %>%
+    arrange(year) %>%
+    mutate(ch_e0 = e0 - lag(e0)) %>%
+    filter(!is.na(ch_e0)) %>%
+    summarise(mean_ch_e0 = mean(ch_e0), sd_ch_e0 = sd(ch_e0)) %>%
+    ungroup()
+
+table_1991_2010_gains %>%
+  set_names(nm = c("Country", "Sex", "Mean gain", "SD")) %>%
+  kable(digits = 3) %>%
+  kable_styling()
+```
+
+#### Average projected improvement - visualised
+
+```{r}
+#| label: fig-proj-assumed-e0-gain
+#| fig-width: 12
+#| fig-height: 8
+ons_projections_summarised %>%
+  ungroup() %>%
+  mutate(country = factor(country, levels = c("UK", "England", "Scotland", "Northern Ireland", "Wales"))) %>%
+  ggplot(aes(x = proj_year, y = mean_ch_e0)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = mean_ch_e0 - 2 * sd_ch_e0, ymax = mean_ch_e0 + 2 * sd_ch_e0), width = 0) +
+  geom_hline(yintercept = 0) +
+  facet_grid(sex ~ country) +
+  expand_limits(y = 0) +
+  labs(
+    x = "Year of projection",
+    y = "Mean projected change in life expectancy (years / year)",
+    title = "Comparison between life expectancy improvements assumed in different ONS projections",
+    caption = "Source: ONS Population Projections"
+  )
+
+ggsave(here("figures", "ons_proj_assumed_e0_gain.png"), height = 20, width = 30, units = "cm", dpi = 300)
+```

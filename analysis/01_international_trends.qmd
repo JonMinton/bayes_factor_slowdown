@@ -1,0 +1,240 @@
+# International trends in life expectancy change
+
+```{r}
+#| label: setup-intl
+#| echo: true
+pacman::p_load(segmented, ggrepel, corrr, readxl, knitr, kableExtra, here, tidyverse)
+
+write_to_table <- function(x, loc){
+  write_csv(x, loc)
+  x
+}
+```
+
+## Data
+
+The data used are $e_0$ (period life expectancy at birth) from the Human Mortality Database [@hmd]. The data were downloaded once using the `HMDHFDplus` package, which requires registered HMD user credentials, and are cached in `data/e0_hmd.csv`; the analyses below load this cached extract.
+
+```{r}
+#| label: load-hmd
+hmd_e0 <- read_csv(here("data", "e0_hmd.csv"))
+```
+
+## Results
+
+We label the countries and pick out only mutually exclusive populations. The code lookups are [here](https://www.mortality.org/Public/HMD-countries-codes.pdf).
+
+```{r}
+#| label: code-lookup
+code_lookup <- tribble(
+  ~code,    ~label,                      ~include,
+  "AUS",     "Australia",                  1,
+  "AUT",     "Austria",                    1,
+  "BLR",     "Belarus",                    1,
+  "BEL",     "Belgium",                    1,
+  "BGR",     "Bulgaria",                   1,
+  "CAN",     "Canada",                     1,
+  "CHL",     "Chile",                      1,
+  "HRV",     "Croatia",                    1,
+  "CZE",     "Czechia",                    1,
+  "DNK",     "Denmark",                    1,
+  "EST",     "Estonia",                    1,
+  "FIN",     "Finland",                    1,
+  "FRATNP",  "France",                     1,
+  "FRACNP",  "France (Civilian)",          0,
+  "DEUTNP",  "Germany",                    1,
+  "DEUTW",   "Germany (West)",             0,
+  "DEUTE",   "Germany (East)",             0,
+  "GRC",     "Greece",                     1,
+  "HUN",     "Hungary",                    1,
+  "ISL",     "Iceland",                    1,
+  "IRL",     "Ireland",                    1,
+  "ISR",     "Israel",                     1,
+  "ITA",     "Italy",                      1,
+  "JPN",     "Japan",                      1,
+  "KOR",     "South Korea",                1,
+  "LVA",     "Latvia",                     1,
+  "LTU",     "Lithuania",                  1,
+  "LUX",     "Luxembourg",                 1,
+  "NLD",     "Netherlands",                1,
+  "NZL_NP",  "New Zealand",                1,
+  "NZL_MA",  "New Zealand (Maori)",        0,
+  "NZL_NM",  "New Zealand (Non-Maori)",    0,
+  "NOR",     "Norway",                     1,
+  "POL",     "Poland",                     1,
+  "PRT",     "Portugal",                   1,
+  "RUS",     "Russia",                     1,
+  "SVK",     "Slovakia",                   1,
+  "SVN",     "Slovenia",                   1,
+  "ESP",     "Spain",                      1,
+  "SWE",     "Sweden",                     1,
+  "CHE",     "Switzerland",                1,
+  "TWN",     "Taiwan",                     1,
+  "GBR_NP",  "United Kingdom",             1,
+  "GBRTENW", "England & Wales (Total)",    0,
+  "GRBCENW", "England & Wales (Civilian)", 0,
+  "GBR_SCO", "Scotland",                   0,
+  "GBR_NIR", "Northern Ireland",           0,
+  "USA",     "USA",                        1,
+  "UKR",     "Ukraine",                    1
+)
+```
+
+```{r}
+#| label: check-coverage
+# Are any codes not matched?
+hmd_e0 %>%
+  left_join(code_lookup, by = c("country" = "code")) %>%
+  count(label)
+
+# What's the first year for each country?
+hmd_e0 %>%
+  left_join(code_lookup, by = c("country" = "code")) %>%
+  group_by(label) %>%
+  summarise(
+    min_year = min(year),
+    max_year = max(year)
+  ) %>%
+  arrange(desc(min_year))
+
+# South Korea: 2003 onwards
+# Croatia: 2002 onwards
+# Chile: 1992 onwards
+# All others at least since 1990
+```
+
+For all mutually exclusive countries in the HMD with data since 1980 onwards, the following shows how annual life expectancy has changed over time.
+
+```{r}
+#| label: fig-ch-e0-all
+ch_e0_from1980_hmd <-
+  hmd_e0 %>%
+    left_join(code_lookup, by = c("country" = "code")) %>%
+    filter(include == 1) %>%
+    filter(!(country %in% c("KOR", "HRV","CHL"))) %>%
+    filter(year >= 1980) %>%
+    filter(sex != "total") %>%
+    group_by(label, sex) %>%
+    arrange(year) %>%
+    mutate(ch_e0 = e0 - lag(e0)) %>%
+    ungroup() %>%
+    write_to_table(here("tables", "change_e0_hmd_from1990.csv"))
+
+ch_e0_from1980_hmd %>%
+  filter(!is.na(ch_e0)) %>%
+  ggplot(aes(x = year, y = ch_e0)) +
+  geom_point() + facet_wrap(~sex) +
+  geom_hline(yintercept = 0)
+```
+
+## HMD average change in $e_0$ by decade
+
+### Figure of HMD average change in $e_0$ by decade
+
+```{r}
+#| label: fig-mean-ch-decade
+#| fig-width: 10
+#| fig-height: 10
+mean_ch_e0_decade_hmd <-
+  ch_e0_from1980_hmd %>%
+    filter(!is.na(ch_e0)) %>%
+    mutate(
+      decade = case_when(
+        between(year, 1980, 1989)      ~ "1980s",
+        between(year, 1990, 1999)      ~ "1990s",
+        between(year, 2000, 2009)      ~ "2000s",
+        between(year, 2010, 2020)      ~ "2010s",
+        TRUE                           ~ NA_character_
+      )
+    ) %>%
+    group_by(label, sex, decade) %>%
+    summarise(mean_ch_e0 = mean(ch_e0, na.rm = TRUE)) %>%
+    ungroup() %>%
+    write_to_table(here("tables", "mean_ch_e0_decade_hmd.csv"))
+
+mean_ch_e0_decade_hmd %>%
+  left_join(
+    mean_ch_e0_decade_hmd %>% filter(decade == "2010s") %>%
+      mutate(ch_last = mean_ch_e0) %>%
+      select(-mean_ch_e0, -decade)
+  ) %>%
+  mutate(decade = fct_rev(decade)) %>%
+  ggplot(aes(x = fct_reorder(label, ch_last), y = mean_ch_e0, group = decade, colour = decade, fill = decade)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~sex) +
+  coord_flip() +
+  scale_fill_grey("Decade", guide = guide_legend(reverse = TRUE)) +
+  scale_colour_grey("Decade", guide = guide_legend(reverse = TRUE)) +
+  labs(
+    x = "Country", y = "Mean annual life expectancy change in years",
+    title = "Mean annual change in life expectancy by country, sex and decade",
+    subtitle = "Countries ordered by mean change in 2010s (lowest at bottom)",
+    caption = "Source: Human Mortality Database"
+  )
+
+ggsave(here("figures", "mean_ch_e0_decade.png"), height = 30, width = 30, units = "cm", dpi = 300)
+
+ggsave(here("bayes_paper", "figures", "A01_intl_mean_ch_e0_by_decade.png"), height = 30, width = 30, units = "cm", dpi = 300)
+```
+
+### Table of HMD average change in $e_0$ by decade
+
+```{r}
+#| label: tbl-mean-ch-decade
+wide_table <-
+  mean_ch_e0_decade_hmd %>%
+    left_join(
+      mean_ch_e0_decade_hmd %>% filter(decade == "2010s") %>%
+        mutate(ch_last = mean_ch_e0) %>%
+        select(-mean_ch_e0, -decade)
+    ) %>%
+    mutate(decade = fct_rev(decade)) %>%
+    arrange(desc(ch_last)) %>%
+    mutate(label = fct_reorder(label, ch_last)) %>%
+    select(-ch_last) %>%
+    unite(col = "sex_decade", sex, decade) %>%
+    rename(Country = label) %>%
+    mutate(mean_ch_e0 = round(mean_ch_e0, 3)) %>%
+    spread(sex_decade, mean_ch_e0) %>%
+    set_names(nm = c("Country", rep(c("1980s", "1990s", "2000s", "2010s"), 2)))
+
+wide_table %>%
+  kable(digits = 3, caption = "Mean annual change in life expectancy (years/year) by country, sex and decade") %>%
+  kable_styling() %>%
+  add_header_above(c(" " = 1, "Female" = 4, "Male" = 4))
+```
+
+The countries with the fastest average improvement in $e_0$ in the 2010s include Belarus (0.38 years/year for females, 0.61 years/year for males), Ukraine (0.34 females, 0.49 males), Russia (0.34 females, 0.48 males), Lithuania (0.23 females, 0.45 males), and Poland (0.25 females, 0.32 males). By contrast, the countries with the slowest improvements in the 2010s include the USA (0.05 females, 0.03 males), Iceland (0.04 females, 0.09 males), the United Kingdom (0.09 females, 0.16 males), Netherlands (0.07 females, 0.19 males), and Germany (0.10 females, 0.17 males). With the exception of the USA, there is still a tendency for improvements in the 2010s to be somewhat faster for males than females. The fastest-improving countries also tended to experience the slowest rates of improvement, or severe deteriorations (worsenings), in life expectancy change in the 1990s.
+
+The similarity between average rates of improvement in the 2010s in Germany and the UK is noteworthy, with average sex-specific improvement rates within 0.01 years per year of each other (0.09 compared with 0.10 for females in the UK and Germany respectively; 0.16 compared with 0.17 for males). The German data cover 2010-2017 inclusive, whereas for the UK the data extend to 2016.
+
+### Annual change in slow gainers since 1980
+
+There are some important differences, however, in how annual change rates have varied in the slowest-improving countries. The figure below shows this for the five slowest-improving countries excluding Iceland, which due to its small population size shows much greater levels of annual variability than the other countries. From this figure it is apparent that the USA not only tended to show lower rates of improvement before 2010, but has also been exhibiting continuing and more persistent declines than the other countries, with three consecutive years of declining mortality for males in the last three available years, and only modest improvements for females.
+
+```{r}
+#| label: fig-slow-gainers
+#| fig-width: 8
+#| fig-height: 8
+ch_e0_from1980_hmd %>%
+  filter(sex != "total") %>%
+  filter(country %in% c("DEUTNP", "NLD", "USA", "GBR_NP")) %>%
+  group_by(label, sex) %>%
+  arrange(year) %>%
+  mutate(ch_e0 = 52.25 * (e0 - lag(e0))) %>%
+  ungroup() %>%
+  rename(Country = label) %>%
+  ggplot(aes(x = year, y = ch_e0, colour = Country, group = Country, shape = Country)) +
+  geom_point() + geom_line() +
+  facet_wrap(~sex, ncol = 1) +
+  geom_hline(yintercept = 0) +
+  labs(
+    x = "Year", y = "Change in life expectancy from previous year (weeks)",
+    title = "Annual change in period life expectancy, selected high income countries",
+    caption = "Source: HMD"
+  )
+
+ggsave(here("figures", "hmd_slow_in_2010s_che0.png"), height = 15, width = 20, units = "cm", dpi = 300)
+
+ggsave(here("bayes_paper", "figures", "A02_selected_high_income.png"), height = 15, width = 20, units = "cm", dpi = 300)
+```

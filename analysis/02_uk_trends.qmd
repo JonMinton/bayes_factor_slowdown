@@ -1,0 +1,487 @@
+# UK trends and breakpoints
+
+The previous chapter used data from the HMD [@hmd], comparing the UK as a whole against other countries in the HMD. The last year available for the UK in the HMD was 2016. More recent $e_0$ estimates are available from the ONS, which also provides estimates disaggregated by country and group of countries within the UK. We use these data to explore how (dis)similar the trends in life expectancy change have been within different UK nations/groups of nations.
+
+```{r}
+#| label: setup-uk
+#| echo: true
+pacman::p_load(segmented, corrr, knitr, kableExtra, here, tidyverse)
+
+source(here("scripts", "load_packages_and_functions.R"))
+```
+
+## Data
+
+The data are the ONS single-year life tables for the UK, 1980 to 2018 [@ons_single_year_lifetables], which provide $e_0$, $m_x$ and related lifetable quantities from a single source, for each UK nation and group of nations. The single-year workbooks were downloaded to the `data` directory, and $e_0$ was extracted from each nation's workbook (England, Northern Ireland, Scotland, Wales, England & Wales, Great Britain, United Kingdom) and cached in `data/e0_from_ons_allnations.csv`; the extraction code lives in the legacy notebook and is not re-run here.
+
+```{r}
+#| label: load-ons-e0
+dta_e0 <- read_csv(here("data", "e0_from_ons_allnations.csv"))
+dta_e0
+```
+
+## Analysis
+
+### Change in life expectancy in UK nations and groups of nations
+
+The following visualises the change in life expectancy for each year.
+
+```{r}
+#| label: fig-ch-e0-uk-nations
+#| fig-width: 12
+#| fig-height: 12
+dta_e0 %>%
+  group_by(population, sex) %>%
+  arrange(year) %>%
+  mutate(ch_e0 = e0 - lag(e0)) %>%
+  ungroup() %>%
+  filter(population %in% c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")) %>%
+  mutate(
+    population = fct_relevel(population, c("United Kingdom","England", "Scotland", "Wales", "Northern Ireland"))
+  ) %>%
+  mutate(ch_e0 = 52.25 * ch_e0) %>%
+  ggplot(aes(x = year, y = ch_e0)) +
+  stat_smooth() +
+  geom_point() + geom_line() +
+  facet_wrap(population ~ sex) +
+  geom_hline(yintercept = 0) +
+  labs(
+    x = "Year", y = "Annual change in life expectancy from previous year (in weeks)",
+    title = "Annual period life expectancy changes in UK and UK nations",
+    subtitle = "Blue line and grey band shows smoothed trend",
+    caption = "Source: ONS life tables (single years)"
+  )
+
+ggsave(here("figures", "annual_e0_ch_alluknations_ons.png"), height = 25, width = 25, units = "cm", dpi = 300)
+
+ggsave(here("bayes_paper", "figures", "A03_Annual_ch_uk_nations.png"), height = 25, width = 25, units = "cm", dpi = 300)
+```
+
+From the above it seems most populations have seen a slowdown in improvement in recent years, and on average relatively stable improvements previously, with the exception of Northern Ireland, which saw a slowdown in improvement in the 1980s. The smaller populations tend to exhibit greater variability in annual rates of change than the larger populations. The extent of oscillation (negative autocorrelation from one year to the next) also appears greater in smaller populations. It is not immediately clear that the breakpoint for the slowdown is the same for all UK populations.
+
+### Average change by decade
+
+As before, we look at the average improvement per decade. This allows us to compare the UK rates from the ONS against those in the HMD.
+
+```{r}
+#| label: ons-ch-decade
+ons_ch_e0_decade <-
+  dta_e0 %>%
+    group_by(population, sex) %>%
+    arrange(year) %>%
+    mutate(ch_e0 = e0 - lag(e0)) %>%
+    ungroup() %>%
+    filter(population %in% c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")) %>%
+    mutate(
+      population = fct_relevel(population, c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"))
+    ) %>%
+    filter(!is.na(ch_e0)) %>%
+    select(-e0) %>%
+    mutate(
+        decade = case_when(
+          between(year, 1980, 1989)      ~ "1980s",
+          between(year, 1990, 1999)      ~ "1990s",
+          between(year, 2000, 2009)      ~ "2000s",
+          between(year, 2010, 2020)      ~ "2010s",
+          TRUE                           ~ NA_character_
+      )
+    ) %>%
+    group_by(population, sex, decade) %>%
+    summarise(mean_ch_e0 = mean(ch_e0, na.rm = TRUE)) %>%
+    ungroup()
+
+ons_ch_e0_decade
+```
+
+```{r}
+#| label: tbl-ons-decade
+wide_table <-
+  ons_ch_e0_decade %>%
+    unite(col = "sex_decade", sex, decade) %>%
+    spread(sex_decade, mean_ch_e0) %>%
+    set_names(., nm = c("Population", rep(c("1980s", "1990s", "2000s", "2010s"), 2)))
+
+wide_table %>%
+  kable(digits = 3, caption = "Mean annual change in life expectancy (years/year) in UK nations, by sex and decade") %>%
+  kable_styling() %>%
+  add_header_above(c(" " = 1, "Female" = 4, "Male" = 4))
+```
+
+As expected, the ONS and HMD estimates of mean improvement per decade are closely aligned, usually within two decimal places, though are somewhat lower in the 2010s for ONS than for HMD. The following produces this comparison directly from both sources.
+
+```{r}
+#| label: tbl-ons-hmd-comparison
+hmd_e0 <- read_csv(here("data", "e0_hmd.csv"))
+
+ons_hmd_comparison_decade <-
+  ons_ch_e0_decade %>%
+    filter(population == "United Kingdom") %>%
+    select(-population) %>%
+    rename(ons = mean_ch_e0) %>%
+    left_join(
+        hmd_e0 %>%
+          filter(country == "GBR_NP") %>%
+          mutate(
+                decade = case_when(
+                  between(year, 1980, 1989)      ~ "1980s",
+                  between(year, 1990, 1999)      ~ "1990s",
+                  between(year, 2000, 2009)      ~ "2000s",
+                  between(year, 2010, 2020)      ~ "2010s",
+                  TRUE                           ~ NA_character_
+              )
+          ) %>%
+          group_by(sex) %>%
+          arrange(year) %>%
+          mutate(ch_e0 = e0 - lag(e0)) %>%
+          group_by(sex, decade) %>%
+          summarise(mean_ch_e0 = mean(ch_e0)) %>%
+          ungroup() %>%
+          filter(!is.na(decade)) %>%
+          filter(sex != "total") %>%
+          rename(hmd = mean_ch_e0)
+    )
+
+ons_hmd_comparison_decade %>%
+  set_names(nm = c("Sex", "Decade", "ONS", "HMD")) %>%
+  kable(digits = 3, caption = "Average annual gain in life expectancy for the UK: ONS compared with HMD") %>%
+  kable_styling()
+```
+
+Presented as a barplot:
+
+```{r}
+#| label: fig-ons-decade-barplot
+ons_ch_e0_decade %>%
+  filter(population %in% c("United Kingdom", "Wales", "Scotland", "England", "Northern Ireland")) %>%
+  left_join(
+    ons_ch_e0_decade %>% filter(decade == "2010s") %>%
+      mutate(ch_last = mean_ch_e0) %>%
+      select(-mean_ch_e0, -decade)
+  ) %>%
+  mutate(decade = fct_rev(decade)) %>%
+  ggplot(aes(x = population, y = mean_ch_e0, group = decade, colour = decade, fill = decade)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~sex) +
+  coord_flip() +
+  scale_fill_grey("Decade", guide = guide_legend(reverse = TRUE)) +
+  scale_colour_grey("Decade", guide = guide_legend(reverse = TRUE)) +
+  labs(
+    x = "Country", y = "Mean annual life expectancy change in years",
+    title = "Mean annual change in life expectancy in UK nations, by sex and decade",
+
+    caption = "Source: Office for National Statistics"
+  )
+
+ggsave(here("figures", "mean_ch_e0_decade_uknations.png"), height = 20, width = 30, units = "cm", dpi = 300)
+ggsave(here("bayes_paper", "figures", "M01_ch_e0_uk_nations_barchart.png"), height = 20, width = 30, units = "cm", dpi = 300)
+```
+
+For each UK nation, the 2000s had exceptionally high rates of improvement. By contrast the 2010s are exceptionally low. Within Northern Ireland, there was an exceptionally high rate of improvement in the 1980s. Rates of improvement in the 2000s have been higher in males than females.
+
+### Change in life expectancy in mutually exclusive UK nations
+
+#### Faceted
+
+```{r}
+#| label: fig-distinct-nations-faceted
+#| fig-width: 12
+#| fig-height: 12
+dta_e0 %>%
+  filter(population %in% c("England", "Wales", "Scotland", "Northern Ireland")) %>%
+  group_by(population, sex) %>%
+  arrange(year) %>%
+  mutate(ch_e0 = e0 - lag(e0)) %>%
+  ungroup() %>%
+  mutate(
+    population = fct_relevel(population, c("England", "Scotland", "Wales", "Northern Ireland"))
+  ) %>%
+  mutate(ch_e0 = 52.25 * ch_e0) %>%
+  ggplot(aes(x = year, y = ch_e0)) +
+  stat_smooth() +
+  geom_point() + geom_line() +
+  facet_wrap(population ~ sex) +
+  geom_hline(yintercept = 0) +
+  labs(
+    x = "Year", y = "Annual change in life expectancy from previous year (in weeks)",
+    title = "Annual period life expectancy changes in UK nations",
+    subtitle = "Blue line and grey band shows smoothed trend",
+    caption = "Source: ONS life tables (single years)"
+  )
+
+ggsave(here("figures", "annual_e0_ch_all_DISTINCT_uknations_ons.png"), height = 25, width = 25, units = "cm", dpi = 300)
+```
+
+#### Overlaid
+
+```{r}
+#| label: fig-distinct-nations-overlaid
+#| fig-width: 12
+#| fig-height: 8
+dta_e0 %>%
+  filter(population %in% c("England", "Wales", "Scotland", "Northern Ireland")) %>%
+  group_by(population, sex) %>%
+  arrange(year) %>%
+  mutate(ch_e0 = e0 - lag(e0)) %>%
+  ungroup() %>%
+  mutate(
+    population = fct_relevel(population, c("England", "Scotland", "Wales", "Northern Ireland"))
+  ) %>%
+  mutate(ch_e0 = 52.25 * ch_e0) %>%
+  ggplot(aes(x = year, y = ch_e0, group = population, colour = population, shape = population)) +
+  geom_point() + geom_line() +
+  facet_wrap(sex ~ .) +
+  geom_hline(yintercept = 0) +
+  labs(
+    x = "Year", y = "Annual change in life expectancy from previous year (in weeks)",
+    title = "Annual period life expectancy changes in UK nations",
+    subtitle = "Blue line and grey band shows smoothed trend",
+    caption = "Source: ONS life tables (single years)"
+  )
+
+ggsave(here("figures", "annual_e0_ch_all_DISTINCT_uknations_ons_overlaid.png"), height = 25, width = 25, units = "cm", dpi = 300)
+```
+
+There are clear similarities between the trends in each of the UK nations, again with the exception of Northern Ireland. The trends even seem to correspond in terms of which years are 'good years' and which years are 'bad years' (i.e. they oscillate in phase with each other). To check this, the following looks at the correlation between the trends.
+
+```{r}
+#| label: fig-corr-trends
+corrs_trends <-
+  dta_e0 %>%
+    filter(population %in% c("England", "Wales", "Scotland", "Northern Ireland")) %>%
+    group_by(population, sex) %>%
+    arrange(year) %>%
+    mutate(ch_e0 = e0 - lag(e0)) %>%
+    ungroup() %>%
+    filter(!is.na(ch_e0)) %>%
+    select(-e0) %>%
+    unite(col = "pop_sex", population, sex) %>%
+    spread(pop_sex, ch_e0) %>%
+    select(-year) %>%
+    correlate()
+
+corrs_trends
+
+corrs_trends %>%
+  rplot(print_cor = TRUE) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(
+    title = "Correlation between trends in annual life expectancy changes",
+    subtitle = "1980 to 2018",
+    caption = "Source: ONS single year lifetables"
+  )
+
+ggsave(here("bayes_paper", "figures", "A04_corr_heatmap_uk.png"), width = 20, height = 20, units = "cm", dpi = 300)
+
+corrs_trends %>%
+  network_plot() +
+  labs(
+    title = "Network plot of correlation between trends in annual life expectancy changes",
+    subtitle = "1980 to 2018",
+    caption = "Source: ONS single year lifetables"
+  )
+
+ggsave(here("bayes_paper", "figures", "A05_corr_network_uk.png"), width = 20, height = 20, units = "cm", dpi = 300)
+```
+
+Trends in males and females in England are highly correlated (r = 0.89). The correlation between male and female trends in Wales are also strong (r = 0.77), which is slightly below the correlation between females in England and Wales (r = 0.81). Correlations between males and females in Scotland are slightly weaker (r = 0.67), and the associations between sexes are weakest in Northern Ireland (r = 0.55).
+
+The network plot places series that are more correlated with each other closer together, and less correlated series further from each other. This confirms that males' and females' trends are closely correlated to each other in England and Wales, somewhat less so in Scotland, and least in Northern Ireland, where trends between sexes are less correlated with each other than are the correlations between countries elsewhere in the UK.
+
+This suggests that any general trends which apply throughout the UK will apply less strongly in Northern Ireland than elsewhere. This should be considered when looking at the results in the next section, which aims to identify if and when there have been breakpoints in the trends in UK nations.
+
+#### Correlation as table
+
+```{r}
+#| label: tbl-corr-trends
+corrs_trends %>%
+  kable(digits = 3, caption = "Correlation between trends in annual life expectancy changes, 1980 to 2018") %>%
+  kable_styling()
+```
+
+### Breakpoint analysis
+
+The following section performs breakpoint analysis using the `segmented` package [@muggeo2008segmented] for each UK nation as well as the UK as a whole.
+
+First we look to see if two and three breakpoints can be identified in any of the populations.
+
+```{r}
+#| label: fit-segmented-models
+datablocks <-
+  dta_e0 %>%
+    group_by(population, sex) %>%
+    arrange(year) %>%
+    mutate(ch_e0 = e0 - lag(e0)) %>%
+    ungroup() %>%
+    filter(!is.na(ch_e0)) %>%
+    select(-e0) %>%
+    group_by(population, sex) %>%
+    nest()
+
+
+segmods_1brk <- vector(mode = "list", length = 14)
+segmods_2brk <- vector(mode = "list", length = 14)
+segmods_3brk <- vector(mode = "list", length = 14)
+
+for (i in 1:14){
+  this_data <- datablocks[["data"]][[i]]
+
+  this_linmod <- lm(ch_e0 ~ year, data = this_data)
+
+  this_segmod_1brk <- tryCatch(segmented(this_linmod, npsi = 1, control = seg.control(seed = 1)), finally = NULL)
+  this_segmod_2brk <- tryCatch(segmented(this_linmod, npsi = 2, control = seg.control(seed = 1)), finally = NULL)
+  this_segmod_3brk <- tryCatch(segmented(this_linmod, npsi = 3, control = seg.control(seed = 1)), finally = NULL)
+
+  segmods_1brk[[i]] <- this_segmod_1brk
+  segmods_2brk[[i]] <- this_segmod_2brk
+  segmods_3brk[[i]] <- this_segmod_3brk
+
+}
+```
+
+In many cases, breakpoints cannot be identified. However this may be because multiple breakpoints are being attempted, but not all can be estimated. We are mainly interested in whether there has been a single breakpoint, and whether this has been identified consistently in all populations.
+
+To investigate this, we explore whether the same single breakpoint can be consistently identified. We can do that by checking whether the choice of random number seed matters.
+
+```{r}
+#| label: fit-segmented-seeds
+segmods1brk_seed01 <- vector(mode = "list", length = 14)
+segmods1brk_seed02 <- vector(mode = "list", length = 14)
+segmods1brk_seed03 <- vector(mode = "list", length = 14)
+segmods1brk_seed06 <- vector(mode = "list", length = 14)
+segmods1brk_seed08 <- vector(mode = "list", length = 14)
+
+
+for (i in 1:14){
+  this_data <- datablocks[["data"]][[i]]
+
+  this_linmod <- lm(ch_e0 ~ year, data = this_data)
+
+  segmods1brk_seed01[[i]] <- tryCatch(segmented(this_linmod, npsi = 1, control = seg.control(seed = 1)), finally = NULL)
+  segmods1brk_seed02[[i]] <- tryCatch(segmented(this_linmod, npsi = 1, control = seg.control(seed = 2)), finally = NULL)
+  segmods1brk_seed03[[i]] <- tryCatch(segmented(this_linmod, npsi = 1, control = seg.control(seed = 3)), finally = NULL)
+  segmods1brk_seed06[[i]] <- tryCatch(segmented(this_linmod, npsi = 1, control = seg.control(seed = 6)), finally = NULL)
+  segmods1brk_seed08[[i]] <- tryCatch(segmented(this_linmod, npsi = 1, control = seg.control(seed = 8)), finally = NULL)
+
+
+}
+```
+
+Note that in the original analysis consecutive random numbers could not all be used, as for some random numbers (4, 5 and 7 in that case) breakpoints could not be identified; the same non-consecutive seed set (1, 2, 3, 6, 8) is retained here.
+
+This shows that one-breakpoint models can be identified for each population, but two- and three-breakpoint models only for some populations. For almost all populations, except Northern Ireland, the breakpoint is identified as around 2009 (so the change from 2009 to 2010).
+
+#### Breakpoint figure
+
+The following shows the breakpoints and standard errors.
+
+```{r}
+#| label: fig-breakpoints
+datablocks %>%
+  ungroup() %>%
+  mutate(
+    segmod_1brk  = segmods_1brk
+  ) %>%
+  mutate(
+    brk_year = map_dbl(segmod_1brk, ~summary(.x)$psi[2]),
+    brk_se   = map_dbl(segmod_1brk, ~summary(.x)$psi[3])
+  ) %>%
+  select(population, sex, brk_year, brk_se) %>%
+  mutate(
+    brk_lwr = brk_year - 2 * brk_se,
+    brk_upr = brk_year + 2 * brk_se
+  ) %>%
+  filter(population %in% c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")) %>%
+  mutate(
+    population = fct_relevel(population, rev(c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")))
+  ) %>%
+  ggplot(aes(x = brk_year, y = population)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = brk_lwr, xmax=brk_upr), height = 0.2) +
+  facet_wrap(~sex) +
+  geom_vline(xintercept = 2018) +
+  labs(
+    x = "Year",
+    y = "Population",
+    title = "Estimates of breakpoint years from one breakpoint models",
+    subtitle = "Error bars show two standard errors around estimate",
+    caption = "Source: ONS Single Year Lifetables"
+
+  ) +
+  theme_light()
+
+ggsave(here("figures", "breakpoint_uk_allgroups.png"), height = 15, width = 25, units = "cm", dpi = 300)
+
+ggsave(here("bayes_paper", "figures", "A10_brk_uk_nations.png"), height = 15, width =25, units ="cm", dpi = 300)
+```
+
+#### Breakpoint table
+
+This shows a lot of consistency in estimates of when the breakdown occurred. With the exception of Northern Ireland, we can use 2010 afterwards as 'post-slowdown', and the years from 1980 onwards as 'pre-slowdown'.
+
+```{r}
+#| label: tbl-breakpoints
+brk_table <-
+  datablocks %>%
+    ungroup() %>%
+    mutate(
+      segmod_1brk  = segmods_1brk
+    ) %>%
+    mutate(
+      brk_year = map_dbl(segmod_1brk, ~summary(.x)$psi[2]),
+      brk_se   = map_dbl(segmod_1brk, ~summary(.x)$psi[3])
+    ) %>%
+    select(population, sex, brk_year, brk_se) %>%
+    mutate(
+      brk_lwr = brk_year - 2 * brk_se,
+      brk_upr = brk_year + 2 * brk_se
+    ) %>%
+    filter(population %in% c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")) %>%
+    mutate(
+      population = fct_relevel(population, rev(c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")))
+    ) %>%
+    rename(
+      Population = population,
+      Sex = sex,
+      Breakpoint = brk_year,
+      `Standard Error` = brk_se,
+      `Lower CI` = brk_lwr, `Upper CI` = brk_upr
+    )
+
+brk_table %>%
+  kable(digits = 2, caption = "Breakpoint year estimates from one breakpoint models, with standard errors and approximate 95% confidence intervals") %>%
+  kable_styling()
+```
+
+#### Effect of different random number seeds on breakpoint
+
+The same is done for the five one-breakpoint models using different seeds.
+
+```{r}
+#| label: fig-seed-sensitivity
+datablocks %>%
+  ungroup() %>%
+  mutate(
+    `1` = segmods1brk_seed01,
+    `2` = segmods1brk_seed02,
+    `3` = segmods1brk_seed03,
+    `6` = segmods1brk_seed06,
+    `8` = segmods1brk_seed08
+  ) %>%
+  select(population, sex, `1`:`8`) %>%
+  gather(key = "seed", value = "model", `1`:`8`) %>%
+  mutate(
+    brk_year = map_dbl(model, ~summary(.x)$psi[2]),
+    brk_sd   = map_dbl(model, ~summary(.x)$psi[3])
+  ) %>%
+  filter(population %in% c("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")) %>%
+  mutate(population = fct_rev(fct_relevel(population, "United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"))) %>%
+  ggplot(aes(x = brk_year, y = population, group = seed, shape = seed, colour = seed)) +
+  geom_point() +
+  facet_wrap(~sex) +
+  labs(x = "Breakpoint estimate", y = "Population",
+       title = "Effect of random number seed on breakpoint estimate")
+
+ggsave(here("bayes_paper", "figures", "A11_random_number_seed_breakpoint.png"), height = 10, width = 15, units = "cm", dpi = 300)
+```
+
+Break point years, where they can be calculated, are largely identical. They confirm 2010 as a reasonable breakpoint year except for Northern Ireland.

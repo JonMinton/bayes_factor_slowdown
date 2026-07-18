@@ -1,0 +1,38 @@
+# Overview {.unnumbered}
+
+This Quarto project is the 2026 restructuring of the analyses behind
+*"Running to a standstill: how responsive have successive ONS life
+expectancy forecasts been to stalling life expectancy gains?"*, originally
+developed in 2019--2020 as a single large R Markdown notebook
+(`markdown/bayes_factor_ons_e0.Rmd`, preserved on the `old/pre-refactor`
+branch).
+
+The core question: ONS life expectancy forecasts systematically
+*under*-projected gains through the 2000s [@white2002longevity;
+@oeppen2002broken] and then systematically *over*-projected them after
+improvement rates stalled around 2010. How quickly did successive biennial
+forecast rounds adapt, and what improvement-rate assumption does the
+accumulated evidence actually support?
+
+The analysis proceeds in five chapters:
+
+1. **International trends** --- annual changes in period life expectancy at
+   birth ($e_0$) across high-income countries (HMD data [@hmd]), placing the
+   UK slowdown in context.
+2. **UK trends and breakpoints** --- $e_0$ trends within UK nations, and
+   changepoint/segmented-regression analysis [@muggeo2008segmented;
+   @killick2014changepoint] locating the break in improvement rates.
+3. **ONS projections** --- five decades of projection rounds against
+   observed $e_0$ [@ons_npp_accuracy; @ons_expectation_of_life], including
+   the 2020-based interim, 2022-based and 2024-based rounds.
+4. **Bayes factors** --- likelihood ratios [@kass1995bayes] for 101
+   candidate slowdown scenarios (0--100% of the 1991--2010 mean improvement
+   rate) against the no-slowdown null, updated as each year of data accrues.
+5. **Bayes factors vs ONS assumptions** --- each projection round converted
+   to an implied slowdown scenario and scored on the same schedule.
+
+Data provenance, known issues and running findings are logged in
+`NOTES.md`. Actual $e_0$ series combine ONS single-year life tables
+(1980--2018/2020) [@ons_single_year_lifetables] with historic estimates
+embedded in the 2024-based NPP release (2019--2024); the last point is the
+projection base year (mid-2024) and is part-estimated.

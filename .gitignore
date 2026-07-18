@@ -35,3 +35,10 @@ vignettes/*.pdf
 # Shiny token, see https://shiny.rstudio.com/articles/shinyapps.html
 rsconnect/
 .Rproj.user
+
+# Quarto
+_book/
+/.quarto/
+
+**/*.quarto_ipynb
+figures/M02_reproduction_check.png

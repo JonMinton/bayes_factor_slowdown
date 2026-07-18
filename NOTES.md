@@ -64,3 +64,19 @@ bottom of each section.
 5. Manuscript update (Quarto manuscript from the chunked docx drafts)
 6. Critique of key arguments; adversarial peer review pass
 7. Preprint (OSF or similar) + journal targeting
+
+## Audit findings (get_ll fix, original 2011-2018 window)
+
+- Corrected BFs at the maximising scenario: UK males ~72, England males
+  ~105 ("strong" on Kass-Raftery), UK/England/Scotland/Wales females ~2-4
+  ("positive"), Northern Ireland males ~1.1 (equivocal). Legacy reported
+  values were all 1.00-1.02.
+- Maximising slowdown percentages reproduce manuscript Table 4 exactly
+  (61% UK both sexes, etc.) - provenance of the buggy numbers confirmed.
+- **Conundrum**: corrected evidence is *stronger for males than females*,
+  inverting the draft's emphasis (which suggested ONS remained too
+  optimistic mainly for females). The female signal is weaker because
+  female annual e0 changes are noisier relative to their (smaller) mean
+  improvement. Re-examine when updating the manuscript.
+- Manuscript prose inconsistency: calibration window described both as
+  "1990 to 2010" and "1991-2010"; code uses changes for 1991-2010.
